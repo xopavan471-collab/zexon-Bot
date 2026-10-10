@@ -2,67 +2,61 @@ import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Logging setup - errors aur activity check karne ke liye
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# Aapka Bot Token yahan daalein
-BOT_TOKEN = "8813177140:AAEfFhMXymvUzF3mBc9asIPj6c-LqJnyNec"
+# Yahan apna Bot Token dalein
+BOT_TOKEN = "8975821926:AAHT9o1zKveOewvGdynjdea1hpa5ulDMwQ0"
 
 
-# /start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+
+    # Name ke andar agar '<', '>' ya '&' ho toh code crash na ho uske liye safe HTML replace
+    first_name = user.first_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") if user.first_name else ""
+    last_name = user.last_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") if user.last_name else "None"
+
+    # 1. Welcome Message
     welcome_text = (
-        f"👋 Hello **{user.first_name}**!\n\n"
-        f"Main ek **User Info Bot** hoon. Apni ya kisi message ki info nikalne ke liye `/info` command ka use karein ya kisi user ke message ko replay karke `/info` bhejein."
+        f"<b>𝐍ᴀᴍᴀꜱᴛᴇ {first_name}</b> ✨\n\n"
+        f"<i>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜꜱᴇʀ ʜɪꜱᴛᴏʀ ʙᴏᴛ\nᴡᴇ ᴄᴀɴ ʜᴇʟᴘ ᴀɴᴅ ᴀʟᴍᴏꜱᴛ ʏᴏᴜ ɢᴇᴛ ʏᴏᴜʀ ᴀʙᴏᴜᴛ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ᴅᴇᴛᴀɪʟꜱ ᴀʟᴡᴀʏꜱ, ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴍᴇ ᴡɪᴛʜ ʏᴏᴜʀ ꜰʀɪᴇɴᴅꜱ ɢʀᴏᴜᴘꜱ ᴋᴇᴇᴘ ꜱᴜᴘᴘᴏʀᴛ.</i>\n\n"
+        f"<b>ʜᴇʀᴇ ɪꜱ ʏᴏᴜʀ ᴜꜱᴇʀ ᴀʙᴏᴜᴛ ʜɪꜱᴛᴏʀʏ</b>"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    # parse_mode="HTML" add kar diya hai
+    await update.message.reply_text(welcome_text, parse_mode="HTML")
 
+    # 2. Profile Photos fetch karna safely
+    try:
+        photos = await context.bot.get_user_profile_photos(user.id)
+        photo_count = photos.total_count if photos else 0
+    except Exception:
+        photo_count = 0
 
-# /info command handler
-async def user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Agar user ne kisi ke message par reply kiya hai, toh us reply waale user ki details lenge
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-    else:
-        # Warna command bhejney waale user ki details lenge
-        target_user = update.effective_user
-
-    # User ki profile pictures ki count nikalna
-    photos = await context.bot.get_user_profile_photos(target_user.id)
-    photo_count = photos.total_count if photos else 0
-
-    # Information format karna
+    # 3. User Info Message
     info_text = (
-        f"👤 **USER INFORMATION** 👤\n\n"
-        f"🔹 **First Name:** {target_user.first_name}\n"
-        f"🔹 **Last Name:** {target_user.last_name if target_user.last_name else 'None'}\n"
-        f"🔹 **Username:** @{target_user.username if target_user.username else 'None'}\n"
-        f"🔹 **User ID:** `{target_user.id}`\n"
-        f"🔹 **Is Bot:** {'Yes' if target_user.is_bot else 'No'}\n"
-        f"🔹 **Language Code:** {target_user.language_code if target_user.language_code else 'N/A'}\n"
-        f"🔹 **Profile Photos:** {photo_count}\n"
+        f"<b>➻ ᴀʙᴏᴜᴛ ᴜꜱᴇʀ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ :</b>\n────────────────────\n"
+        f"๏ ꜰɪʀꜱᴛ ɴᴀᴍᴇ : {first_name}\n"
+        f"๏ ʟᴀꜱᴛ ɴᴀᴍᴇ : {last_name}\n"
+        f"๏ ᴜꜱᴇʀɴᴀᴍᴇ : @{user.username if user.username else 'None'}\n"
+        f"๏ ᴜꜱᴇʀ ɪᴅ : <code>{user.id}</code>\n"
+        f"๏ ʟᴀɴɢᴜᴀɢᴇ : {user.language_code if user.language_code else 'N/A'}\n"
+        f"๏ ᴘʀᴏꜰɪʟᴇ ᴘɪᴄᴛᴜʀᴇ : {photo_count}\n────────────────────\n"
     )
 
-    await update.message.reply_text(info_text, parse_mode="Markdown")
+    # parse_mode="HTML" add kar diya hai
+    await update.message.reply_text(info_text, parse_mode="HTML")
 
 
 def main():
-    # Application build karna
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # Handlers register karna
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("info", user_info))
 
     print("Bot chalu ho gaya hai...")
-    # Bot ko run karna
     app.run_polling()
 
 
 if __name__ == "__main__":
     main()
-  
+    
