@@ -6,8 +6,8 @@ from mega import Mega
 import gdown
 
 API_ID = "33208732"
-API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "8813177140:AAEfFhMXymvUzF3mBc9asIPj6c-LqJnyNec"
+API_HASH = "HASH"
+BOT_TOKEN = "BOT TOKEN"
 
 app = Client("zexon_uploader", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
