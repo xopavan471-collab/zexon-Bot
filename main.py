@@ -9,7 +9,7 @@ logging.basicConfig(
 )
 
 # Aapka Bot Token yahan daalein
-BOT_TOKEN = "8975821926:AAF9Uv88X2KFvGoCBe5pEpe6LBZ6WAFwJxc"
+BOT_TOKEN = "BOT TOKEN"
 
 
 # /start command handler
