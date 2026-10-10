@@ -1,1 +1,5 @@
-python-telegram-bot==20.7
+pyrogram
+tgcrypto
+yt-dlp
+mega.py
+gdown
