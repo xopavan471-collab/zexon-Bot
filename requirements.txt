@@ -1,5 +1,4 @@
 pyrogram
 tgcrypto
-yt-dlp
-mega.py
-gdown
+aiohttp
+
