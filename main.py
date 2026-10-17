@@ -1,96 +1,278 @@
-import logging
-import aiohttp
-from bs4 import BeautifulSoup
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from os import remove
+from threading import Thread
+from re import search
+import re
+from urlextract import URLExtract
+from texts import HELP_TEXT
+import bypasser
+import freewall
+from time import time
+from db import DB
+
+# Kurigram / Pyrogram Client imports
+from kurigram import Client, filters
+from kurigram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    BotCommand,
+    Message,
+)
 
 # ==================== CONFIGURATION ====================
-# Yahan apna Telegram Bot Token daalna hai jo aapko BotFather se mila hai:
-BOT_TOKEN = "8476616777:AAG-iOSBfCQcfJ-4pic2KcfjlmkoVKGBRm8"
+# Yahan apni real details daliye:
+BOT_TOKEN = "8476616777:AAG-iOSBfCQcfJ-4pic2KcfjlmkoVKGBRm8"      # BotFather se mila hua Token (quotes ke andar)
+API_ID = 33208732                    # my.telegram.org se mila hua API ID (bina quotes ke number)
+API_HASH = "28626a3063a8161fc374ce904093c4e0"        # my.telegram.org se mila hua API Hash (quotes ke andar)
+
+# Database details (Agar database nahi hai toh None rehne dein)
+DB_API = None
+DB_OWNER = None
+DB_NAME = None
 # =======================================================
 
-# Logging setup taaki errors terminal me dikhein
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Initialize URL extractor
+extractor = URLExtract()
 
-async def bypass_shortener(target_url: str) -> str:
-    """
-    Core Bypass Engine: Redirection aur Form/Scraping logic
-    """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+# Initialize Pyrogram/Kurigram Client
+app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-    async with aiohttp.ClientSession(headers=headers) as session:
-        try:
-            # Step 1: Follow direct redirects
-            async with session.get(target_url, allow_redirects=True, timeout=10) as response:
-                final_url = str(response.url)
-                html_content = await response.text()
-
-            # Step 2: HTML Scraping agar page par form ya tags ho
-            if "<form" in html_content.lower():
-                soup = BeautifulSoup(html_content, "html.parser")
-                form = soup.find("form")
-                if form and form.get("action"):
-                    action_url = form.get("action")
-                    return f"Form Detected!\nAction URL: {action_url}"
-                
-                for a in soup.find_all("a", href=True):
-                    href = a['href']
-                    if "http" in href and "google" not in href:
-                        return href
-
-            return final_url
-
-        except Exception as e:
-            return f"Error aa gaya: {str(e)}"
-
-# /start command handler
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Hello! Main aapka Link Bypass Bot hoon.\n\n"
-        "Link bypass karne ke liye yeh command use karein:\n"
-        "`/bypass https://get2short.com/your-link`",
-        parse_mode="Markdown"
+with app:
+    app.set_bot_commands(
+        [
+            BotCommand("start", "Welcome Message"),
+            BotCommand("help", "List of All Supported Sites"),
+        ]
     )
 
-# /bypass command handler
-async def bypass_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("⚠️ Kripya link bhi dein! Example: `/bypass <url>`", parse_mode="Markdown")
+# Database setup
+try:
+    if DB_API and DB_OWNER and DB_NAME:
+        database = DB(api_key=DB_API, db_owner=DB_OWNER, db_name=DB_NAME)
+    else:
+        database = None
+except:
+    print("Database is Not Set")
+    database = None
+
+# Handle index
+def handleIndex(ele: str, message: Message, msg: Message):
+    result = bypasser.scrapeIndex(ele)
+    try:
+        app.delete_messages(message.chat.id, msg.id)
+    except:
+        pass
+    if database and result:
+        database.insert(ele, result)
+    for page in result:
+        app.send_message(
+            message.chat.id,
+            page,
+            reply_to_message_id=message.id,
+            disable_web_page_preview=True,
+        )
+
+# URL regex pattern
+URL_REGEX = r'(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%.]+'
+
+# Loopthread function
+def loopthread(message: Message, otherss=False):
+    urls = []
+    if otherss:
+        texts = message.caption or ""
+    else:
+        texts = message.text or ""
+
+    entities = []
+    if otherss and hasattr(message, 'caption_entities') and message.caption_entities:
+        entities = message.caption_entities
+    elif message.entities:
+        entities = message.entities
+
+    # Step 1: Extract URLs from entities
+    if entities:
+        for entity in entities:
+            entity_type = str(entity.type)
+            normalized_type = entity_type.split('.')[-1].lower() if '.' in entity_type else entity_type.lower()
+            
+            if normalized_type == "url":
+                url = texts[entity.offset:entity.offset + entity.length]
+                urls.append(url)
+            elif normalized_type == "text_link":
+                if hasattr(entity, 'url') and entity.url:
+                    urls.append(entity.url)
+
+    # Step 2: Fallback to text-based URL extraction
+    extracted_urls = extractor.find_urls(texts)
+    urls.extend(extracted_urls)
+    regex_urls = re.findall(URL_REGEX, texts)
+    urls.extend(regex_urls)
+
+    # Step 3: Clean and deduplicate URLs
+    cleaned_urls = []
+    for url in urls:
+        cleaned_url = url.strip(".,").rstrip("/")
+        if cleaned_url:
+            cleaned_urls.append(cleaned_url)
+    urls = list(dict.fromkeys(cleaned_urls))
+    
+    if not urls:
+        app.send_message(
+            message.chat.id,
+            "No valid URLs found in the message.",
+            reply_to_message_id=message.id
+        )
         return
 
-    target_url = context.args[0]
-    processing_msg = await update.message.reply_text("⏳ Link bypass ho raha hai, thoda intezaar karein...")
+    # Step 4: Normalize URLs
+    normalized_urls = []
+    for url in urls:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        normalized_urls.append(url)
+    urls = normalized_urls
 
-    # Bypass function ko call karein
-    result_link = await bypass_shortener(target_url)
+    # Bypassing logic status message
+    if bypasser.ispresent(bypasser.ddl.ddllist, urls[0]):
+        msg: Message = app.send_message(
+            message.chat.id, "⚡ __generating...__", reply_to_message_id=message.id
+        )
+    elif freewall.pass_paywall(urls[0], check=True):
+        msg: Message = app.send_message(
+            message.chat.id, "🕴️ __jumping the wall...__", reply_to_message_id=message.id
+        )
+    else:
+        if "https://olamovies" in urls[0] or "https://psa.wf/" in urls[0]:
+            msg: Message = app.send_message(
+                message.chat.id,
+                "⏳ __this might take some time...__",
+                reply_to_message_id=message.id,
+            )
+        else:
+            msg: Message = app.send_message(
+                message.chat.id, "🔎 __bypassing...__", reply_to_message_id=message.id
+            )
 
-    # User ko final result bhejein
-    await context.bot.edit_message_text(
-        chat_id=update.effective_chat.id,
-        message_id=processing_msg.message_id,
-        text=f"✅ **Bypass Successful!**\n\n🔗 **Final Link:**\n`{result_link}`",
-        parse_mode="Markdown"
+    strt = time()
+    links = ""
+    temp = None
+
+    for ele in urls:
+        if database:
+            df_find = database.find(ele)
+        else:
+            df_find = None
+        if df_find:
+            print("Found in DB")
+            temp = df_find
+        elif search(r"https?:\/\/(?:[\w.-]+)?\.\w+\/\d+:", ele):
+            handleIndex(ele, message, msg)
+            return
+        elif bypasser.ispresent(bypasser.ddl.ddllist, ele):
+            try:
+                temp = bypasser.ddl.direct_link_generator(ele)
+            except Exception as e:
+                temp = "**Error**: " + str(e)
+        elif freewall.pass_paywall(ele, check=True):
+            freefile = freewall.pass_paywall(ele)
+            if freefile:
+                try:
+                    app.send_document(
+                        message.chat.id, freefile, reply_to_message_id=message.id
+                    )
+                    remove(freefile)
+                    app.delete_messages(message.chat.id, [msg.id])
+                    return
+                except:
+                    pass
+            else:
+                app.send_message(
+                    message.chat.id, "__Failed to Jump", reply_to_message_id=message.id
+                )
+        else:
+            try:
+                temp = bypasser.shortners(ele)
+            except Exception as e:
+                temp = "**Error**: " + str(e)
+
+        print("bypassed:", temp)
+        if temp is not None:
+            if (not df_find) and ("http://" in temp or "https://" in temp) and database:
+                print("Adding to DB")
+                database.insert(ele, temp)
+            links = links + temp + "\n"
+
+    end = time()
+    print("Took " + "{:.2f}".format(end - strt) + "sec")
+
+    # Send bypassed links
+    try:
+        final = []
+        tmp = ""
+        for ele in links.split("\n"):
+            tmp += ele + "\n"
+            if len(tmp) > 4000:
+                final.append(tmp)
+                tmp = ""
+        final.append(tmp)
+        app.delete_messages(message.chat.id, msg.id)
+        tmsgid = message.id
+        for ele in final:
+            tmsg = app.send_message(
+                message.chat.id,
+                f"__{ele}__",
+                reply_to_message_id=tmsgid,
+                disable_web_page_preview=True,
+            )
+            tmsgid = tmsg.id
+    except Exception as e:
+        app.send_message(
+            message.chat.id,
+            f"__Failed to Bypass : {e}__",
+            reply_to_message_id=message.id,
+        )
+
+# Start command
+@app.on_message(filters.command(["start"]))
+def send_start(client: Client, message: Message):
+    app.send_message(
+        message.chat.id,
+        f"__👋 Hi **{message.from_user.mention}**, I am Link Bypasser Bot, just send me any supported links and I will get you results.\nCheckout /help to Read More__",
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🌐 Source Code",
+                        url="https://github.com/bipinkrish/Link-Bypasser-Bot",
+                    )
+                ],
+            ]
+        ),
+        reply_to_message_id=message.id,
     )
 
-def main():
-    # Bot Application initialize karein
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+# Help command
+@app.on_message(filters.command(["help"]))
+def send_help(client: Client, message: Message):
+    app.send_message(
+        message.chat.id,
+        HELP_TEXT,
+        reply_to_message_id=message.id,
+        disable_web_page_preview=True,
+    )
 
-    # Handlers add karein
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("bypass", bypass_command))
+# Text message handler
+@app.on_message(filters.text)
+def receive(client: Client, message: Message):
+    bypass = Thread(target=lambda: loopthread(message), daemon=True)
+    bypass.start()
 
-    print("🤖 Bot successfully start ho gaya hai...")
-    # Bot ko run karein
-    application.run_polling()
+# Media file handler
+@app.on_message([filters.document, filters.photo, filters.video])
+def docfile(client: Client, message: Message):
+    bypass = Thread(target=lambda: loopthread(message, True), daemon=True)
+    bypass.start()
 
-if __name__ == "__main__":
-    main()
-        
+# Start the bot
+print("Bot Starting")
+app.run()
+                        
