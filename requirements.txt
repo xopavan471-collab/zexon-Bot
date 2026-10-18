@@ -1,6 +1,2 @@
-python-telegram-bot
 pyrofork
-aiohttp
-aiogram 
-curl_cffi
-pycryptodome
+tgcrypto
