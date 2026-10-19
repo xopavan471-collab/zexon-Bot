@@ -1,231 +1,585 @@
-#!/usr/bin/env python3
-import asyncio
-import logging
+import sys
 import re
-import time
+import sre_parse
 import urllib.parse
-import aiohttp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+import types
 
-# Cloudflare & Anti-Bot bypass ke liye curl_cffi AsyncSession
+# 0. Python 3.12 cfscrape DEFAULT_CIPHERS fix
 try:
-    from curl_cffi.requests import AsyncSession
+    import urllib3.util.ssl_
+    if not hasattr(urllib3.util.ssl_, 'DEFAULT_CIPHERS'):
+        urllib3.util.ssl_.DEFAULT_CIPHERS = "DEFAULT"
 except ImportError:
-    AsyncSession = None
+    pass
 
-# ==================== CONFIGURATION ====================
-BOT_TOKEN = "8476616777:AAHuixXmf0u0_qh0oMNSrk9JjkD-Xl_sfLQ"  # Aapka Bot Token
-BYPASS_API_KEY = "bl_live_1699d4c4a63d873862fc4dae6db68570033c"  # Aapki api.bypass.tools ki API Key
-# =======================================================
+# 1. Python 3.12 Mock for pkg_resources
+class MockVersion:
+    def __init__(self, v):
+        self.v = v
+    def __lt__(self, other): return str(self.v) < str(other)
+    def __le__(self, other): return str(self.v) <= str(other)
+    def __eq__(self, other): return str(self.v) == str(other)
+    def __ne__(self, other): return str(self.v) != str(other)
+    def __gt__(self, other): return str(self.v) > str(other)
+    def __ge__(self, other): return str(self.v) >= str(other)
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+if 'pkg_resources' not in sys.modules:
+    pkg_res_mock = types.ModuleType('pkg_resources')
+    pkg_res_mock.parse_version = lambda v: MockVersion(v)
+    sys.modules['pkg_resources'] = pkg_res_mock
 
-async def pure_native_unshorten(url: str) -> str:
-    """
-    Bit.ly, tinyurl, cutt.ly, is.gd jaise normal short links ko direct unshorten karna.
-    """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    }
+# 2. Python 3.12 compatibility fix for lk21 library (sre_parse)
+if not hasattr(re, 'sre_parse'):
+    re.sre_parse = sre_parse
 
+# 3. Python 3.12 robust urllib IPv6 check fix
+if hasattr(urllib.parse, '_check_bracketed_netloc'):
+    old_check = urllib.parse._check_bracketed_netloc
+    def new_check(*args, **kwargs):
+        try:
+            return old_check(*args, **kwargs)
+        except ValueError:
+            pass
+    urllib.parse._check_bracketed_netloc = new_check
+
+# Imports
+import telebot
+import bypasser
+import os
+from config import log, Vars, sys
+import ddl
+
+# Setup Logger
+log.basicConfig(
+    level=log.INFO,
+    datefmt="%d/%m/%Y %H:%M:%S",
+    format="[%(asctime)s][%(levelname)s] => %(message)s",
+    handlers=[log.StreamHandler(stream=sys.stdout),
+              log.FileHandler("runtime-log.txt", mode="a", encoding="utf-8")],)
+
+# ==========================================
+# 🔑 YAHAN APNA TELEGRAM BOT TOKEN DAALEIN
+# ==========================================
+BOT_TOKEN = "8476616777:AAHuixXmf0u0_qh0oMNSrk9JjkD-Xl_sfLQ"  # <= Apne Bot Father Ka Token Yahan Paste Karein
+
+# Initialize Telebot Instance
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# System Variables / Cookies (Agar config file me set ho)
+GDTot_Crypt = Vars[1] if len(Vars) > 1 else ""
+Laravel_Session = Vars[2] if len(Vars) > 2 else ""
+XSRF_TOKEN = Vars[3] if len(Vars) > 3 else ""
+KCRYPT = Vars[4] if len(Vars) > 4 else ""
+DCRYPT = Vars[5] if len(Vars) > 5 else ""
+HCRYPT = Vars[6] if len(Vars) > 6 else ""
+KATCRYPT = Vars[7] if len(Vars) > 7 else ""
+
+
+# start
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "🔗 *Available Sites* \n\n  \
+ `/dl` - _direct download link (/ddllist)_ \n  \
+ `/af` - _adfly_ \n  \
+ `/gp` - _gplinks_ \n  \
+ `/dp` - _droplink_ \n  \
+ `/lv` - _linkvertise_ \n  \
+ `/rl` - _rocklinks_ \n  \
+ `/gd` - _gdrive look-alike (/gdlist)_ \n  \
+ `/ot` - _others (/otlist)_ \n  \
+ `/ou` - _ouo_ \n  \
+ `/gt` - _gdtot_ \n  \
+ `/sh` - _sharer_ \n  \
+ `/ps` - _psa_ \n  \
+ `/st` - _shorte_ \n  \
+ `/pi` - _pixl_ \n  \
+ `/gy` - _gyanilinks_ \n  \
+ `/sg` - _shortingly_ \n  \
+ `/su` - _shareus_ \n  \
+ `/fc` - _filecrypt_ \n  \
+ `/ko` - _kolop_ \n  \
+ `/df` - _drivefire_ \n  \
+ `/hd` - _hubdrive_ \n  \
+ `/kd` - _katdrive_ \n\n\
+_reply to the link with command or use format /xx link_",
+parse_mode="Markdown")
+
+
+# direct download link
+@bot.message_handler(commands=['dl'])
+def dl(message):
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                final_url = str(response.url)
-                
-                if final_url and final_url.rstrip('/') != url.rstrip('/'):
-                    return final_url
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/dl ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received DDL Link {url}")
+    msg = bot.reply_to(message, "⚡ _generating..._", parse_mode="Markdown")
+    link = ddl.direct_link_generator(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-                html_text = await response.text()
-                
-                meta_match = re.search(r'content=["\']\d+;\s*url=([^"\']+)["\']', html_text, re.IGNORECASE)
-                if meta_match:
-                    meta_url = meta_match.group(1).strip()
-                    if meta_url.startswith("http"):
-                        return meta_url
 
-                loc_match = re.search(r'window\.location(?:\.href)?\s*=\s*["\']([^"\']+)["\']', html_text)
-                if loc_match:
-                    loc_url = loc_match.group(1).strip()
-                    if loc_url.startswith("http"):
-                        return loc_url
-
-    except Exception as e:
-        logger.error(f"Native unshorten error: {e}")
-
-    return None
-
-async def bypass_with_api(target_url: str) -> str:
-    """
-    bypass link ki official API ka use karke shortener links bypass karna.
-    """
-    if not AsyncSession or not BYPASS_API_KEY:
-        return None
-        
+# katdrive
+@bot.message_handler(commands=['kd'])
+def kd(message):
+    if KATCRYPT == "":
+        bot.reply_to(message, "🚫 _You can't use this because_ *KATDRIVE_CRYPT* _ENV is not set_", parse_mode="Markdown")
+        log.info("Unable to bypass KatDrive Link due to absence of Cookie(s).")
+        return
     try:
-        api_url = f"https://bypass-links.com/api/v1/bypass?url={urllib.parse.quote(target_url)}"
-        headers = {
-            "Authorization": f"Bearer {BYPASS_API_KEY}",
-            "Accept": "application/json"
-        }
-        
-        async with AsyncSession(impersonate="chrome120") as session:
-            resp = await session.get(api_url, headers=headers, timeout=20)
-            if resp.status_code == 200:
-                data = resp.json()
-                final_link = data.get("destination") or data.get("url") or data.get("result")
-                if final_link and final_link.startswith("http"):
-                    return final_link
-    except Exception as e:
-        logger.error(f"Bypass API error: {e}")
-        
-    return None
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/kd ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received KatDrive Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.katdrive_dl(url, KATCRYPT)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-async def bypass_mediafire(target_url: str) -> str:
-    """
-    MediaFire link se direct downloadable file link extract karna.
-    """
-    if "mediafire.com" not in target_url.lower():
-        return None
-    if not AsyncSession:
-        return None
-        
-    try:
-        async with AsyncSession(impersonate="chrome120") as session:
-            resp = await session.get(target_url, allow_redirects=True, timeout=15)
-            html = resp.text
-            match = re.search(r'href="([^"]+)"\s+id="downloadButton"', html)
-            if match:
-                direct_link = match.group(1)
-                if direct_link.startswith("http"):
-                    return direct_link
-    except Exception as e:
-        logger.error(f"MediaFire bypass error: {e}")
-    
-    return None
 
-def get_start_keyboard():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates"),
-            InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛᴇᴅ", callback_data="btn_supported")
-        ]
-    ])
-
-def get_back_keyboard():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="btn_home")
-        ]
-    ])
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_name = update.effective_user.first_name or "User"
-    
-    text = (
-        f"<b>𝐇ɪ {user_name}</b>\n\n"
-        "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴢᴇxᴏɴ ʙʏᴘᴀꜱꜱ ʙᴏᴛ</b></blockquote>\n"
-        "<blockquote><i>ᴡᴇ ᴄᴀɴ ʙʏᴘᴀꜱꜱ ᴘᴀᴘᴜʟᴀʀ ꜱʜᴏʀᴛɴᴇʀ ʟɪɴᴋ, ꜱᴇɴᴅ ᴍᴇ ᴀɴʏ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ᴛʜᴇɴ ɪ'ᴍ  ᴘʀᴏꜱᴇꜱꜱ ʏᴏᴜʀ ʟɪɴᴋ ᴀɴᴅ ɢɪᴠᴇ ʏᴏᴜ ꜰɪɴᴀʟ ʟɪɴᴋ, ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ᴛᴏ ɢᴇᴛ ꜱᴛᴀʀᴛᴇᴅ, ᴘʟᴇᴀꜱᴇ ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʜɪɢʜ ꜱʜᴏʀᴛɴᴇʀ ᴡᴇʙꜱɪᴛᴇ ʟɪɴᴋ, ꜱᴇɴᴅ ɴᴏʀᴍᴀʟ ʟɪɴᴋ ᴛᴏ ʜᴀɴᴅʟᴇ ᴅɪꜱɪꜱɪᴏɴ.</i></blockquote>\n"
-        "<blockquote><b>ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʜɪɢʜ ꜱʜᴏʀᴛɴᴇʀ ʟɪɴᴋ</b></blockquote>"
-    )
-
-    if update.message:
-        await update.message.reply_text(text, parse_mode="HTML", reply_markup=get_start_keyboard())
-    elif update.callback_query:
-        query = update.callback_query
-        await query.answer()
-        await query.edit_message_text(text=text, parse_mode="HTML", reply_markup=get_start_keyboard())
-
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "btn_update":
-        await query.answer("Bot is already running on the latest version! 🚀", show_alert=True)
-    
-    elif query.data == "btn_supported":
-        supported_text = (
-            "<b>Supported Websites & Links:</b>\n\n"
-            "• <b>Normal Shorteners:</b> bit.ly, tinyurl.com, cutt.ly, is.gd\n"
-            "• <b>File Storage:</b> mediafire.com\n"
-            "• <b>Ad-Shorteners & Gates:</b> Supported via api.bypass.tools\n\n"
-            "<i>Send any supported link to get started!</i>"
-        )
-        await query.edit_message_text(text=supported_text, parse_mode="HTML", reply_markup=get_back_keyboard())
-    
-    elif query.data == "btn_home":
-        user_name = query.from_user.first_name or "User"
-        home_text = (
-            f"<b>𝐇ɪ {user_name}</b>\n\n"
-            "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴢᴇxᴏɴ ʙʏᴘᴀꜱꜱ ʙᴏᴛ</b></blockquote>\n"
-            "<blockquote><i>ᴡᴇ ᴄᴀɴ ʙʏᴘᴀꜱꜱ ᴘᴀᴘᴜʟᴀʀ ꜱʜᴏʀᴛɴᴇʀ ʟɪɴᴋ, ꜱᴇɴᴅ ᴍᴇ ᴀɴʏ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ᴛʜᴇɴ ɪ'ᴍ  ᴘʀᴏꜱᴇꜱꜱ ʏᴏᴜʀ ʟɪɴᴋ ᴀɴດ ɢɪᴠᴇ ʏᴏᴜ ꜰɪɴᴀʟ ʟɪɴᴋ, ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ᴛᴏ ɢᴇᴛ ꜱᴛᴀʀᴛᴇᴅ, ᴘʟᴇᴀꜱᴇ ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʜɪɢʜ ꜱʜᴏʀᴛɴᴇʀ ᴡᴇʙꜱɪᴛᴇ ʟɪɴᴋ, ꜱᴇɴᴅ ɴᴏʀᴍᴀʟ ʟɪɴᴋ ᴛᴏ ʜᴀɴᴅʟᴇ ᴅɪꜱɪꜱɪᴏɴ.</i></blockquote>\n"
-            "<blockquote><b>ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʜɪɢʜ ꜱʜᴏʀᴛɴᴇʀ ʟɪɴᴋ</b></blockquote>"
-        )
-        await query.edit_message_text(text=home_text, parse_mode="HTML", reply_markup=get_start_keyboard())
-
-async def auto_link_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if not text:
+# hubdrive
+@bot.message_handler(commands=['hd'])
+def hd(message):
+    if HCRYPT == "":
+        bot.reply_to(message, "🚫 _You can't use this because_ *HUBDRIVE_CRYPT* _ENV is not set_", parse_mode="Markdown")
+        log.error("Unable to bypass HubDrive Link due to absence of Cookie(s).")
         return
 
-    url_match = re.search(r'https?://[^\s]+', text)
-    if not url_match:
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/hd ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received HubDrive Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.hubdrive_dl(url, HCRYPT)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# drivefire
+@bot.message_handler(commands=['df'])
+def df(message):
+    if DCRYPT == "":
+        bot.reply_to(message, "🚫 _You can't use this because_ *DRIVEFIRE_CRYPT* _ENV is not set_", parse_mode="Markdown")
+        log.error("Unable to bypass DriveFire Link due to absence of Cookie(s).")
         return
 
-    target_url = url_match.group(0)
-    
-    start_time = time.time()
-    processing_msg = await update.message.reply_text("𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ...")
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/df ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received DriveFire Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.drivefire_dl(url, DCRYPT)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-    # 1. Sabse pehle normal links (bit.ly, tinyurl, cutt.ly) ke liye native unshortener try karo
-    result_link = await pure_native_unshorten(target_url)
 
-    # 2. Agar wahan se na aaye, toh official api.bypass.tools API se try karo
-    if not result_link:
-        result_link = await bypass_with_api(target_url)
+# kolop
+@bot.message_handler(commands=['ko'])
+def ko(message):
+    if KCRYPT == "":
+        bot.reply_to(message, "🚫 _You can't use this because_ *KOLOP_CRYPT* _ENV is not set_", parse_mode="Markdown")
+        log.error("Unable to bypass Kolop Link due to absence of Cookie(s).")
+        return
 
-    # 3. Agar MediaFire hai toh direct scraper use karo
-    if not result_link and "mediafire.com" in target_url.lower():
-        result_link = await bypass_mediafire(target_url)
-        
-    elapsed = round(time.time() - start_time, 2)
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/ko ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received kolop Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.kolop_dl(url, KCRYPT)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-    if result_link:
-        response_text = (
-            f"<blockquote><b>Original Link :</b></blockquote>\n{target_url}\n"
-            f"<blockquote><b>Bypassed Link :</b></blockquote>\n{result_link}\n\n"
-            f"<blockquote><b>Time Elapsed</b> ⧖➙ {elapsed} s</blockquote>\n\n<blockquote><b>𝐏ᴏᴡᴇʀᴇᴅ ʙʏ :</b> @zexon_Bypass_Bot</blockquote>"
-        )
-    else:
-        response_text = (
-            f"<blockquote><i>BYPASS FAILED ❌</i></blockquote>\n\n"
-            f"<i>Unsupported Link ⚠️</i>\n\n"
-            f"<blockquote>Elapsed ⧖➙ {elapsed}s</blockquote>"
-        )
 
-    await context.bot.edit_message_text(
-        chat_id=update.effective_chat.id,
-        message_id=processing_msg.message_id,
-        text=response_text,
-        disable_web_page_preview=True,
-        parse_mode="HTML"
-    )
+# filecrypt
+@bot.message_handler(commands=['fc'])
+def fc(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/fc ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received FileCrypt Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.filecrypt(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-def main():
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), auto_link_handler))
 
-    print("🤖 zexon Bypass Bot (API Integrated) start ho gaya hai!")
-    application.run_polling()
+# shareus
+@bot.message_handler(commands=['su'])
+def su(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/su ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received ShareUs Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.shareus(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
 
-if __name__ == "__main__":
-    main()
-                
+
+# shortingly
+@bot.message_handler(commands=['sg'])
+def sg(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/sg ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Shortingly Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.shortlingly(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# gyanilinks
+@bot.message_handler(commands=['gy'])
+def gy(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/gy ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Gyanilinks Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.gyanilinks(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# pixl
+@bot.message_handler(commands=['pi'])
+def pi(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/pi ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Pixl Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.pixl(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# shorte
+@bot.message_handler(commands=['st'])
+def st(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/st ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Shorte Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.sh_st_bypass(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# psa
+@bot.message_handler(commands=['ps'])
+def ps(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/ps ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received PSA Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    links = bypasser.psa_bypasser(url)
+    bot.edit_message_text(f'_{links}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# sharer pw
+@bot.message_handler(commands=['sh'])
+def sh(message):
+    if XSRF_TOKEN == "" or Laravel_Session == "":
+        bot.reply_to(message, "🚫 _You can't use this because_ *XSRF_TOKEN* _and_ *Laravel_Session* _ENV are not set_", parse_mode="Markdown")
+        log.error("Unable to bypass Sharer.pw Link due to absence of Cookie(s).")
+        return
+
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/sh ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Sharer.pw Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.sharer_pw(url, Laravel_Session, XSRF_TOKEN)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# gdtot url
+@bot.message_handler(commands=['gt'])
+def gt(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/gt ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received GdToT Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.gdtot(url,GDTot_Crypt)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# adfly short url
+@bot.message_handler(commands=['af'])
+def af(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/af ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received AdFly Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    out = bypasser.adfly(url)
+    link = out['bypassed_url']
+    try:    
+        bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+    except:
+        bot.edit_message_text("_Failed to Bypass_", msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# gplinks short url
+@bot.message_handler(commands=['gp'])
+def gp(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/gp ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received GPLinks Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.gplinks(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# droplink url
+@bot.message_handler(commands=['dp'])
+def dp(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/dp ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received DropLink: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.droplink(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+   
+
+# linkvertise short url
+@bot.message_handler(commands=['lv'])
+def lv(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/lv ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Linkvertise Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.linkvertise(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# rocklinks link
+@bot.message_handler(commands=['rl'])
+def rl(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/rl ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received RockLinks Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.rocklinks(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown")
+
+
+# ouo
+@bot.message_handler(commands=['ou'])
+def ou(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/ou ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    print("You Have Entered ouo:",url)
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.ouo(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown") 
+
+
+# gd look a like
+@bot.message_handler(commands=['gd'])
+def gd(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/gd ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received GD Look-A-Like Link: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.unified(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown") 
+
+
+# others
+@bot.message_handler(commands=['ot'])
+def ot(message):
+    try:
+        url = message.reply_to_message.text
+    except:
+        try:
+            url = message.text.split("/ot ")[1]
+        except:
+            bot.reply_to(message, "⚠️ _Invalid format, either_ *reply* _to a_ *link* _or use_ */xx link*", parse_mode="Markdown")
+            return
+    log.info(f"Received Others links: {url}")
+    msg = bot.reply_to(message, "🔎 _bypassing..._", parse_mode="Markdown")
+    link = bypasser.others(url)
+    bot.edit_message_text(f'_{link}_', msg.chat.id, msg.id, parse_mode="Markdown") 
+
+
+# gd list
+@bot.message_handler(commands=['gdlist'])
+def gdlis(message):
+    list = """_
+- appdrive.in \n\
+- driveapp.in \n\
+- drivehub.in \n\
+- gdflix.pro \n\
+- drivesharer.in \n\
+- drivebit.in \n\
+- drivelinks.in \n\
+- driveace.in \n\
+- drivepro.in \n\
+          _"""
+    bot.reply_to(message, list, parse_mode="Markdown")
+
+
+# others list
+@bot.message_handler(commands=['otlist'])
+def otlis(message):
+    list="""_
+- exe.io/exey.io \n\
+- sub2unlock.net/sub2unlock.com \n\
+- rekonise.com \n\
+- letsboost.net \n\
+- ph.apps2app.com \n\
+- mboost.me	\n\
+- sub4unlock.com \n\
+- ytsubme.com \n\
+- bit.ly \n\
+- social-unlock.com	\n\
+- boost.ink	\n\
+- goo.gl \n\
+- shrto.ml \n\
+- t.co \n\
+- tinyurl.com
+    _"""
+    bot.reply_to(message, list, parse_mode="Markdown")       
+
+
+# ddl list
+@bot.message_handler(commands=['ddllist'])
+def ddllis(message):
+    list="""_
+- disk.yandex.com \n\
+- mediafire.com \n\
+- uptobox.com \n\
+- osdn.net \n\
+- github.com \n\
+- hxfile.co \n\
+- anonfiles.com \n\
+- letsupload.io \n\
+- 1drv.ms(onedrive) \n\
+- pixeldrain.com \n\
+- antfiles.com \n\
+- streamtape.com \n\
+- bayfiles.com \n\
+- res-cache.com \n\
+- 1fichier.com \n\
+- solidfiles.com \n\
+- krakenfiles.com \n\
+- upload.ee \n\
+- mdisk.me \n\
+- wetransfer.com \n\
+- gofile.io \n\
+- dropbox.com \n\
+- zippyshare.com \n\
+- megaup.net \n\
+- fembed.net, fembed.com, femax20.com, fcdn.stream, feurl.com, layarkacaxxi.icu, naniplay.nanime.in, naniplay.nanime.biz, naniplay.com, mm9842.com \n\
+- sbembed.com, watchsb.com, streamsb.net, sbplay.org
+    _"""
+    bot.reply_to(message, list, parse_mode="Markdown")       
+
+# server loop
+log.info("--BOT STARTED--")
+bot.infinity_polling()
