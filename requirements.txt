@@ -1,10 +1,2 @@
-requests
-cloudscraper
-bs4 
-python-dotenv
-pyTelegramBotAPI
-lxml
-lk21
-cfscrape
-setuptools
-urllib3<2.0.0
+pyrofork
+tgcrypto
