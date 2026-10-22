@@ -159,20 +159,13 @@ class TelegramAPIError(RuntimeError): pass
 
 async def telegram_request(client: Any, method: str, data: dict[str, Any] | None = None, files: dict[str, Any] | None = None, timeout: float = 40) -> Any:
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
-    proxies = {
-        "http": "http://proxy.server:3128",
-        "https": "http://proxy.server:3128"
-    }
 
     def _do_post():
-        for attempt in range(3):
-            try:
-                response = requests.post(url, data=data, files=files, timeout=timeout, proxies=proxies)
-                return response.json()
-            except Exception as e:
-                if attempt == 2:
-                    return {"ok": False, "description": str(e)}
-                time.sleep(2)
+        try:
+            response = requests.post(url, data=data, files=files, timeout=timeout)
+            return response.json()
+        except Exception as e:
+            return {"ok": False, "description": str(e)}
 
     payload = await asyncio.to_thread(_do_post)
     if not payload.get("ok"): raise TelegramAPIError(f"{method}: {payload.get('description')}")
