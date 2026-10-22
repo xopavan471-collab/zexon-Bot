@@ -5,7 +5,7 @@ from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineK
 # Apni Telegram API credentials yahan daalein
 API_ID = 33208732       # My.telegram.org se milega
 API_HASH = "28626a3063a8161fc374ce904093c4e0"   # My.telegram.org se milega
-BOT_TOKEN = "BOT TOKEN" # BotFather se milega
+BOT_TOKEN = "8923952201:AAHg2atUeNRYI-_TaO9JNmbHaiBSAOT9xyg" # BotFather se milega
 
 app = Client(
     "fancy_font_pyrogram_bot",
@@ -68,12 +68,12 @@ def make_fancy(text: str) -> dict:
 @app.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message: Message):
     welcome_text = (
-        f"<b>𝐇ʏ {message.from_user.first_name}</b>\n\n"
+        f"<b>𝐇ɪ {message.from_user.first_name}</b>\n\n"
         "<blockquote><b><i>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ꜱᴛʏʟɪꜱʜ ꜰᴀɴᴄʏ ꜰᴏɴᴛꜱ ɢᴇɴᴇʀᴀᴛᴏʀ  ʙᴏᴛ, ʏᴏᴜ ᴄᴀɴ ɢᴇᴛ ʏᴏᴜʀ ꜱᴛʏʟɪꜱʜ ꜰᴀɴᴄʏ ꜰᴏɴᴛ ᴛᴇxᴛ ᴀɴᴅ ᴀʟᴡᴀʏꜱ ʜᴀᴘᴘᴇɴꜱ , ʀᴇᴀᴅʏ ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ꜱᴛʏʟɪꜱʜ ꜰᴏɴᴛ ᴛᴇxᴛ ᴊᴜꜱᴛ ᴜꜱᴇ ꜰᴏɴᴛ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ʏᴏᴜʀ ꜰᴏɴᴛ ꜱᴛʏʟᴇ ᴛᴇxᴛ, ᴘʟᴇᴀꜱᴇ ᴜꜱᴇ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ɢɪᴠᴇ ᴛᴇxᴛ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ɪᴛ ꜰᴀɴᴄʏ ꜰᴏɴᴛ ꜱᴛʏʟᴇ ᴇᴀꜱʏ, ʜᴀᴠᴇ ꜰᴜɴ ɴɪᴄᴇ ᴅᴀʏ ᴇɴᴊᴏʏ ꜰᴜɴ ᴍᴀꜱᴛɪ</i></b></blockquote>\n"
-        "<blockquote>**ꜰᴇᴀᴛᴜʀᴇꜱ ✨**\n"
+        "<blockquote><u>**ꜰᴇᴀᴛᴜʀᴇꜱ ✨</u>**\n"
         "<b>• ᴛʀᴀɴꜱꜰᴇʀ ɴᴏʀᴍᴀʟ ᴛᴇxᴛ ɪɴᴛᴏ ꜰᴀɴᴄʏ ꜱᴛʏʟᴇ </b></blockquote>\n"
         "<blockquote><b>• ᴀʟʟ ꜰᴏɴᴛꜱ ᴀᴠᴀɪʟᴀʙʟᴇ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ</b></blockquote>\n"
-        "<blockquote>**ʜᴏᴡ ᴛᴏ ᴜꜱᴇ :**"
+        "<blockquote><u>**ʜᴏᴡ ᴛᴏ ᴜꜱᴇ :</u>**"
          "<b> ꜱᴇɴᴅ /font ᴛʜᴀᴛ ꜱɪᴅᴇ ᴡʀɪᴛᴇ ʏᴏᴜʀ ᴛᴇxᴛ</b></blockquote>\n"
     )
     
@@ -131,4 +131,3 @@ async def auto_reaction(client: Client, message: Message):
 # Bot Start
 print("Pyrogram Bot is running successfully...")
 app.run()
-
