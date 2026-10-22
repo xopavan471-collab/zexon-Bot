@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import urlparse, parse_qs
 from yt_dlp import YoutubeDL
 
-TOKEN = "8986816218:AAHnfkyvQtaV_N_GaPa738zCqeFZuHzFkxU"
+TOKEN = "MEWWWWO....GHOP GHOP GHOP 😂"
 MAX_AUDIO_BYTES = 49_000_000
 DOWNLOAD_TIMEOUT_SECONDS = 45
 USER_DB_PATH = Path(os.environ.get("USER_DB_PATH", "bot_users.sqlite3"))
