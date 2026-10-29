@@ -8,7 +8,7 @@ from pyrogram.errors import MessageNotModified, FloodWait
 
 API_ID = 33208732  
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "8830089254:AAHFqLDxVdO9HLqSAldQiktP27IZzSNjCxQ"
 ADMIN_ID = 8562470788  
 
 app = Client(
