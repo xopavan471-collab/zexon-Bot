@@ -1,351 +1,206 @@
-from __future__ import annotations
-import asyncio, json, logging, os, re, sqlite3, tempfile, time, requests
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse, parse_qs
-from yt_dlp import YoutubeDL
+import asyncio
+import os
+import time
+import gc
+from pyrogram import Client, filters
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.errors import MessageNotModified, FloodWait
 
-TOKEN = "MEWWWWO....GHOP GHOP GHOP 😂"
-MAX_AUDIO_BYTES = 49_000_000
-DOWNLOAD_TIMEOUT_SECONDS = 45
-USER_DB_PATH = Path(os.environ.get("USER_DB_PATH", "bot_users.sqlite3"))
-SUPPORTED_HOSTS = ("youtube.com","youtu.be","instagram.com","facebook.com","fb.watch",)
-LAST_URLS: dict[int, str] = {}
+API_ID = 33208732  
+API_HASH = "28626a3063a8161fc374ce904093c4e0"
+BOT_TOKEN = "8830089254:AAEA5XwunZpRRsJj76foeBbwjY33zsNQUKs"
+ADMIN_ID = 8562470788  
 
-def parse_admin_ids() -> set[int]:
-    admin_ids: set[int] = set()
-    for value in os.environ.get("ADMIN_USER_IDS", "").split(","):
-        value = value.strip()
-        if value.lstrip("-").isdigit(): admin_ids.add(int(value))
-    return admin_ids
+app = Client(
+    "zexon_renamer_bot", 
+    api_id=API_ID, 
+    api_hash=API_HASH, 
+    bot_token=BOT_TOKEN,
+    workdir="./",
+    workers=32,
+    max_concurrent_transmissions=20,
+    ipv6=False
+)
 
-ADMIN_USER_IDS = parse_admin_ids() or {8562470788}
+user_data = {}
+registered_users = set()
+total_renamed_files = 0
 
-logging.basicConfig(format="%(asctime)s | %(levelname)s | %(name)s | %(message)s", level=os.environ.get("LOG_LEVEL", "INFO").upper())
-logger = logging.getLogger("zexon-music-bot")
+def humanbytes(size):
+    if not size: 
+        return "0.00"
+    return f"{size / (1024*1024):.2f}"
 
-def init_user_store() -> None:
-    with sqlite3.connect(USER_DB_PATH) as c:
-        c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT NOT NULL DEFAULT '', first_name TEXT NOT NULL DEFAULT '', last_name TEXT NOT NULL DEFAULT '', language_code TEXT NOT NULL DEFAULT '', first_seen_at INTEGER NOT NULL, last_activity_at INTEGER NOT NULL, download_count INTEGER NOT NULL DEFAULT 0)")
+def stylish_number(text):
+    m = {'0':'𝟶','1':'𝟷','2':'𝟸','3':'𝟹','4':'𝟺','5':'𝟻','6':'𝟼','7':'𝟽','8':'𝟾','9':'𝟿','.':'.', '%':'%'}
+    return ''.join(m.get(c, c) for c in str(text))
 
-def record_user(user: dict[str, Any], download: bool = False) -> None:
-    user_id = user.get("id")
-    if not isinstance(user_id, int): return
-    now = int(time.time())
-    with sqlite3.connect(USER_DB_PATH) as c:
-        c.execute("INSERT INTO users (user_id, username, first_name, last_name, language_code, first_seen_at, last_activity_at, download_count) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET username=CASE WHEN excluded.username<>'' THEN excluded.username ELSE users.username END, first_name=CASE WHEN excluded.first_name<>'' THEN excluded.first_name ELSE users.first_name END, last_name=CASE WHEN excluded.last_name<>'' THEN excluded.last_name ELSE users.last_name END, language_code=CASE WHEN excluded.language_code<>'' THEN excluded.language_code ELSE users.language_code END, last_activity_at=excluded.last_activity_at, download_count=users.download_count+excluded.download_count",
-        (user_id, str(user.get("username") or ""), str(user.get("first_name") or ""), str(user.get("last_name") or ""), str(user.get("language_code") or ""), now, now, 1 if download else 0))
+async def progress_for_pyrogram(current, total, status_message, start_time, action_type, last_edit_holder):
+    now = time.time()
+    
+    # 2 sec cooldown
+    if (now - last_edit_holder["time"] < 2.0) and current != total:
+        return
+        
+    last_edit_holder["time"] = now
+    diff = now - start_time
+    if diff <= 0: 
+        diff = 1
+        
+    percentage = (current * 100 / total) if total and total > 0 else 0
+    speed = current / diff
+    
+    if speed > 0:
+        eta = int((total - current) / speed)
+    else:
+        eta = 0
 
-def safe_record_user(user: dict[str, Any], download: bool = False) -> None:
-    try: record_user(user, download)
-    except sqlite3.Error: logger.exception("DB fail")
+    filled = min(14, int(percentage * 14 / 100))
+    bar = "▣" * filled + "▢" * (14 - filled)
+    head = "<b>ꜱᴛᴀᴛᴜꜱ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</b>\n" if "Download" in action_type else "<b>ꜱᴛᴀᴛᴜꜱ ᴜᴘʟᴏᴀᴅɪɴɢ :</b>\n"
+    
+    text = (
+        f"{head}\n{bar}\n\n"
+        f"<blockquote><b>ꜱɪᴢxᴇ :</b> {stylish_number(humanbytes(total))} ᴍʙ\n"
+        f"<b>ᴅᴏɴᴇ :</b> {stylish_number(humanbytes(current))} ᴍʙ\n"
+        f"<b>ꜱᴘᴇᴇᴅ :</b> {stylish_number(humanbytes(speed))} ᴍʙ\n"
+        f"<b>ʟᴇꜰᴛ ᴇᴛᴀ :</b> {stylish_number(eta)} ꜱ</blockquote>\n\n<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @Rename_zexon_Bot</blockquote>"
+    )
 
-def format_user_time(timestamp: int) -> str: return datetime.fromtimestamp(timestamp, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # MAIN FIX - Same text ko edit karne se rokega
+    if last_edit_holder.get("last_text") == text:
+        return
+    last_edit_holder["last_text"] = text
 
-def get_bot_stats() -> tuple[int, int]:
+    try: 
+        await status_message.edit_text(text)
+    except MessageNotModified:
+        pass
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+    except Exception: 
+        pass
+
+START_TEXT = (
+    "<b>𝐇ɪ {name}</b>\n\n"
+    "<blockquote><b>𝐖ᴇʟᴄᴏᴍᴇ 𝐓ᴏ 𝐀ᴅᴠᴀɴᴄᴇ 𝐑ᴇɴᴀᴍᴇ 𝐁ᴏᴛ</b></blockquote>\n"
+    "<blockquote><i>ᴡᴇ ᴀʀᴇ ᴀᴅᴠᴀɴᴄᴇ ᴀɴᴅ ᴀʟᴍᴏꜱᴛ ꜰᴀꜱᴛ ꜰɪʟᴇ ʀᴇɴᴀᴍᴇ ʙᴏᴛ ᴡɪᴛʜ ʟᴀʀɢᴇʀ ꜱɪᴢᴇ ꜱᴜᴘᴘᴏʀᴛ ꜰɪʟᴇ ᴍᴀxɪᴍᴜᴍ ꜰɪᴠᴇ ʜᴜɴᴅʀᴇᴅ, ᴡᴇ ᴄᴀɴ ꜰᴀꜱᴛ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ, ɪꜰ ʏᴏᴜ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ ᴛʜᴇɴ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ᴏꜰ ʏᴏᴜʀ ꜰɪʟᴇ ᴀɴᴅ ɢᴇᴛ ʏᴏᴜʀ ʀᴇɴᴀᴍᴇᴅ ꜰɪʟᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
+    "<blockquote><b>ᴛʜᴇ ᴍᴀɪɴᴛᴇɴᴇᴅ ʙʏ : ᴢᴇxᴏɴ ᴘᴀᴠᴀɴ</b></blockquote>"
+)
+
+START_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates"), InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot")],
+    [InlineKeyboardButton("ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/zexon_x")],
+    [InlineKeyboardButton("ᴀʙᴏᴜᴛ", callback_data="about_btn"), InlineKeyboardButton("ʜᴇʟᴘ", callback_data="help_btn")],
+    [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_btn")]
+])
+
+@app.on_message(filters.command("start"))
+async def start(client: Client, message: Message):
+    registered_users.add(message.from_user.id)
+    await message.reply_text(text=START_TEXT.format(name=message.from_user.first_name), reply_markup=START_KEYBOARD, disable_web_page_preview=True, quote=True)
+
+@app.on_callback_query()
+async def callback_handler(client: Client, callback_query: CallbackQuery):
+    data = callback_query.data
     try:
-        with sqlite3.connect(USER_DB_PATH) as c:
-            cur1 = c.execute("SELECT COUNT(*) FROM users")
-            total_users = cur1.fetchone()[0] or 0
-            cur2 = c.execute("SELECT SUM(download_count) FROM users")
-            total_downloads = cur2.fetchone()[0] or 0
-            return total_users, total_downloads
-    except sqlite3.Error:
-        logger.exception("DB stats fail")
-        return 0, 0
-
-def is_supported_url(value: str) -> bool:
-    try: parsed=urlparse(value)
-    except ValueError: return False
-    hostname=(parsed.hostname or "").lower().removeprefix("www.")
-    return parsed.scheme in {"http","https"} and any(hostname==h or hostname.endswith(f".{h}") for h in SUPPORTED_HOSTS)
-
-def is_youtube_url(value: str) -> bool:
-    try: hostname=(urlparse(value).hostname or "").lower().removeprefix("www.")
-    except ValueError: return False
-    return hostname=="youtube.com" or hostname.endswith(".youtube.com") or hostname=="youtu.be"
-
-def clean_filename(value: str, fallback: str = "audio") -> str:
-    cleaned=re.sub(r"[^\w\s.-]","",value,flags=re.UNICODE); cleaned=re.sub(r"\s+"," ",cleaned).strip(); return cleaned[:100] or fallback
-
-def get_youtube_id(url: str) -> str | None:
-    try:
-        parsed=urlparse(url)
-        hostname=(parsed.hostname or "").lower().removeprefix("www.")
-        if "youtu.be" in hostname: return parsed.path.lstrip("/").split("?")[0].split("&")[0][:11]
-        qs=parse_qs(parsed.query)
-        if "v" in qs: return qs["v"][0][:11]
-        m=re.search(r"/(?:shorts|embed|watch)/([^/?&]+)", parsed.path)
-        if m: return m.group(1)[:11]
-    except Exception: pass
-    m = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
-    return m.group(1) if m else None
-
-def extract_thumbnail(url: str) -> tuple[str | None, str]:
-    options={"quiet":True,"no_warnings":True,"skip_download":True,"noplaylist":True,"socket_timeout":DOWNLOAD_TIMEOUT_SECONDS}
-    title = "Thumbnail"
-    thumbnail = None
-    try:
-        with YoutubeDL(options) as ydl:
-            info=ydl.extract_info(url, download=False)
-            title = info.get("title") or "Thumbnail"
-            thumbnail = info.get("thumbnail")
+        if data == "about_btn":
+            about_text = "╭━━━━━━━━━━━━━━━━━➣\n┣⪼ <b><u>ʜᴇʀᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ</u></b>\n┣⪼ ɴᴀᴍᴇ : ʀᴇɴᴀᴍᴇʀ ᴢᴇxᴏɴ ʙᴏᴛ\n┣⪼ ʜᴏᴍᴇ : ꜱɪʟʟʏ ᴅᴇᴠᴇʟᴏᴘᴍᴇɴᴛ\n┣⪼ ʟᴀɴɢᴜᴀɢᴇ : ᴘʏᴛʜᴏɴ ᴇɴɢʟɪꜱʜ\n┣⪼ ᴛʜᴇ god : ᴍʀ ᴢᴇxᴏɴ ᴘᴀᴠᴀɴ\n┣⪼ ʜᴇʟᴘ ᴄᴏɴɴᴇᴄᴛ : @zexon_x\n╰━━━━━━━━━━━━━━━━━➣"
+            await callback_query.message.edit_text(text=about_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="back_btn")]]))
+        elif data == "help_btn":
+            help_text = "<b><u>ʜᴏᴡ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ :</u></b>\n𝟷. ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ᴀɴʏ ꜰɪʟᴇ\n𝟸. ᴛʜᴇɴ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ\n𝟹. ᴡᴀɪᴛ ꜱᴀᴍᴇ ᴛɪᴍᴇ ꜰᴏʀ ʀᴇɴᴀᴍɪɴɢ\n𝟺. ᴘʟᴇᴀꜱᴇ ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʙɪɢ ꜰɪʟᴇ"
+            await callback_query.message.edit_text(text=help_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="back_btn")]]))
+        elif data == "main_menu" or data == "back_btn":
+            await callback_query.message.edit_text(text=START_TEXT.format(name=callback_query.from_user.first_name), reply_markup=START_KEYBOARD, disable_web_page_preview=True)
+        elif data == "close_btn":
+            await callback_query.message.delete()
+    except MessageNotModified:
+        pass
     except Exception:
         pass
 
-    if not thumbnail and is_youtube_url(url):
-        vid=get_youtube_id(url)
-        if vid:
-            thumbnail = f"https://img.youtube.com/vi/{vid}/maxresdefault.jpg"
+@app.on_message(filters.command("status") & filters.user(ADMIN_ID))
+async def bot_status(client: Client, message: Message):
+    await message.reply_text(f"📊 **Bot Live Status**\n\n👥 **Total Users:** `{len(registered_users)}`\n📁 **Total Renamed:** `{total_renamed_files}`", quote=True)
 
-    return thumbnail, title
-
-def download_audio(url: str, directory: str) -> tuple[Path, str]:
-    hdr = {"User-Agent": "Mozilla/5.0"}
-    if is_youtube_url(url):
-        video_id = get_youtube_id(url)
-        if not video_id: raise ValueError("invalid_youtube_url")
-        for server in ["https://pipedapi.kavin.rocks", "https://api.piped.private.coffee", "https://pipedapi.adminforge.de"]:
-            try:
-                res = requests.get(f"{server}/streams/{video_id}", headers=hdr, timeout=20)
-                if res.status_code!= 200: continue
-                data = res.json()
-                streams = data.get("audioStreams", [])
-                if not streams: continue
-                title = data.get("title", "audio")[:80]
-                best = sorted(streams, key=lambda x: x.get('bitrate',0), reverse=True)[0]
-                dl_url = best.get("url")
-                if not dl_url: continue
-                safe_name = clean_filename(title, video_id)
-                path = Path(directory) / f"{safe_name}.mp3"
-                with requests.get(dl_url, headers=hdr, stream=True, timeout=60) as dl:
-                    with open(path, 'wb') as f:
-                        for chunk in dl.iter_content(8192): f.write(chunk)
-                if path.stat().st_size > 5000:
-                    return path, title
-            except Exception as e:
-                logger.warning(f"Piped fail {server}: {e}")
-
-    for client_name in ["android", "ios", "mweb", "web"]:
-        try:
-            ydl_opts = {
-                "format": "bestaudio/best",
-                "outtmpl": os.path.join(directory, "%(title).80s.%(ext)s"),
-                "noplaylist": True, "restrictfilenames": False, "quiet": True, "no_warnings": True,
-                "socket_timeout": DOWNLOAD_TIMEOUT_SECONDS, "nocheckcertificate": True,
-                "extractor_args": {"youtube": {"player_client": [client_name]}} if is_youtube_url(url) else {},
-                "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}],
-            }
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get("title") or "audio"
-                mp3s = list(Path(directory).glob("*.mp3"))
-                if not mp3s: mp3s = list(Path(directory).glob("*.*"))
-                if mp3s:
-                    audio_path = mp3s[0]
-                    if audio_path.suffix!= ".mp3":
-                        new_path = audio_path.with_suffix(".mp3")
-                        audio_path.rename(new_path)
-                        audio_path = new_path
-                    if audio_path.stat().st_size > MAX_AUDIO_BYTES: raise ValueError("audio_too_large")
-                    return audio_path, title
-        except Exception as e:
-            logger.warning(f"yt-dlp {client_name} fail: {e}")
-            continue
-    raise ValueError("this link can't download")
-
-class TelegramAPIError(RuntimeError): pass
-
-async def telegram_request(client: Any, method: str, data: dict[str, Any] | None = None, files: dict[str, Any] | None = None, timeout: float = 40) -> Any:
-    url = f"https://api.telegram.org/bot{TOKEN}/{method}"
-
-    def _do_post():
-        try:
-            response = requests.post(url, data=data, files=files, timeout=timeout)
-            return response.json()
-        except Exception as e:
-            return {"ok": False, "description": str(e)}
-
-    payload = await asyncio.to_thread(_do_post)
-    if not payload.get("ok"): raise TelegramAPIError(f"{method}: {payload.get('description')}")
-    return payload.get("result")
-
-async def send_message(client: Any, chat_id: int, text: str, keyboard=None) -> Any:
-    data={"chat_id":str(chat_id),"text":text,"parse_mode":"HTML"}
-    if keyboard: data["reply_markup"]=json.dumps({"inline_keyboard":keyboard},ensure_ascii=False)
-    return await telegram_request(client,"sendMessage",data=data)
-
-async def edit_message(client: Any, chat_id: int, message_id: int, text: str, keyboard=None) -> None:
-    data={"chat_id":str(chat_id),"message_id":str(message_id),"text":text,"parse_mode":"HTML"}
-    if keyboard: data["reply_markup"]=json.dumps({"inline_keyboard":keyboard},ensure_ascii=False)
-    try: await telegram_request(client,"editMessageText",data=data)
-    except TelegramAPIError: pass
-
-async def delete_message(client: Any, chat_id: int, message_id: int) -> None:
-    try: await telegram_request(client,"deleteMessage",data={"chat_id":str(chat_id),"message_id":str(message_id)})
-    except TelegramAPIError: pass
-
-async def answer_callback(client: Any, callback_id: str) -> None:
-    try: await telegram_request(client,"answerCallbackQuery",data={"callback_query_id":callback_id})
-    except TelegramAPIError: pass
-
-async def send_photo(client: Any, chat_id: int, photo: str) -> Any:
-    return await telegram_request(client,"sendPhoto",data={"chat_id":str(chat_id),"photo":photo})
-
-async def send_audio(client: Any, chat_id: int, audio_path: Path, title: str) -> Any:
-    with audio_path.open("rb") as f:
-        safe_title = clean_filename(title)
-        return await telegram_request(
-            client,
-            "sendAudio",
-            data={
-                "chat_id": str(chat_id),
-                "title": safe_title
-            },
-            files={"audio": (f"{safe_title}.mp3", f, "audio/mpeg")},
-            timeout=75
-        )
-
-def start_keyboard():
-    return [
-        [{"text":"ᴜᴘᴅᴀᴛᴇꜱ","url":"https://t.me/zexon_Bot_updates"},{"text":"ꜱᴜᴘᴘᴏʀᴛ","url":"https://t.me/URL_Save_Bot"}],
-        [{"text":"ᴀʙᴏᴜᴛ","callback_data":"about"},{"text":"ꜱʜᴀʀᴇ","url":"https://t.me/zexon_music_Bot"}],
-        [{"text":"ᴅᴇᴠᴇʟᴏᴘᴇʀ","url":"https://t.me/zexon_x"}],
-        [{"text":"ᴄʟᴏꜱᴇ","callback_data":"close"}]
-    ]
-
-def back_keyboard():
-    return [[{"text":"🔙 ʙᴀᴄᴋ","callback_data":"home"}]]
-
-async def handle_start(client: Any, chat_id: int, first_name: str) -> None:
-    await send_message(client,chat_id,
-        f"<b>𝐇ɪ, {first_name} ✨</b> \n\n"
-        "<i>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ɪɴꜱᴛᴀɢʀᴀᴍ ꜰᴀᴄᴇʙᴏᴋ ᴍᴜꜱɪᴄ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴅᴏᴡɴʟᴏᴀᴅ ʙᴏᴛ.</i>\n"
-        "<i>ᴡᴇ ᴄᴀɴ ꜱᴀᴠᴇ ᴍᴜꜱɪᴄ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏʀᴍ ɪɴꜱᴛᴀɢʀᴀᴍ ꜰᴀᴄᴇʙᴏᴏᴋ ꜱᴏᴄɪᴀʟ ᴍᴇᴅɪᴀ</i>\n"
-        "<i>ɪꜰ ʏᴏᴜ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ʟɪɴᴋ ᴀɴᴅ ɢᴇᴛ ᴍᴜꜱɪᴄ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴀꜱᴛ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ</i>\n\n"
-        "ꜱᴛʏʟɪꜱʜ ᴍᴀɪɴᴛᴇɴᴇᴅ : ᴢᴇxᴏɴ",
-        keyboard=start_keyboard())
-
-async def handle_stats(client: Any, chat_id: int, user_id: int) -> None:
-    if ADMIN_USER_IDS and user_id not in ADMIN_USER_IDS:
+@app.on_message(filters.document | filters.video | filters.audio)
+async def handle_file(client: Client, message: Message):
+    file = message.document or message.video or message.audio
+    registered_users.add(message.from_user.id)
+    max_limit = 1000 * 1024 * 1024
+    if (file.file_size or 0) > max_limit:
+        await message.reply_text("Big File Can't Download ⚠️", quote=True)
         return
-    total_users, total_downloads = get_bot_stats()
-    stats_text = (
-        "📊 <b><u>The About users :</u></b>\n\n"
-        f"• <b>Total Users :</b> <code>{total_users}</code>\n"
-        f"• <b>Total Downloads :</b> <code>{total_downloads}</code>"
-    )
-    await send_message(client, chat_id, stats_text)
-
-async def handle_message(client: Any, message: dict[str, Any]) -> None:
-    chat=message.get("chat",{}); chat_id=chat.get("id"); text=(message.get("text") or "").strip()
-    if not isinstance(chat_id,int) or not text: return
-    sender=message.get("from") or {}
-    if isinstance(sender,dict): await asyncio.to_thread(safe_record_user,sender)
-    command=text.split(maxsplit=1)[0].split("@",1)[0].lower()
-
-    if command=="/start":
-        await handle_start(client,chat_id,(sender.get("first_name") if isinstance(sender,dict) else None) or "दोस्त")
-        return
-    if command in ["/stats", "/status", "/users"]:
-        sender_id = sender.get("id") if isinstance(sender, dict) else 0
-        await handle_stats(client, chat_id, sender_id)
-        return
-
-    if not is_supported_url(text): await send_message(client,chat_id,"<i>𝑫𝒆𝒂𝒓, 𝒔𝒆𝒏𝒅 𝒎𝒆 𝒚𝒐𝒖 𝒕𝒖𝒃𝒆 𝑰𝒏𝒔𝒕𝒂𝒈𝒓𝒂𝒎 𝑭𝒂𝒄𝒆𝒃𝒐𝒐𝒌 𝑳𝒊𝒏𝒌 🔗</i>"); return
-    LAST_URLS[chat_id]=text
-    await send_message(client,chat_id,"<b>𝐒ᴇʟᴇᴄᴛ 𝐅ᴏʀᴍᴀᴛ :</b>\n",keyboard=[[{"text":"𝐀ᴜᴅɪᴏ 🎵","callback_data":"music"},{"text":"𝐓ʜᴜᴍʙɴᴀɪʟ 🖼️","callback_data":"thumb"}]])
-
-async def handle_callback(client: Any, callback: dict[str, Any]) -> None:
-    callback_user=callback.get("from") or {}
-    if isinstance(callback_user,dict): await asyncio.to_thread(safe_record_user,callback_user)
-    callback_id=callback.get("id")
-    if isinstance(callback_id,str): await answer_callback(client,callback_id)
-    message=callback.get("message") or {}; chat_id=(message.get("chat") or {}).get("id"); message_id=message.get("message_id"); choice=callback.get("data")
-    if not isinstance(chat_id,int) or not isinstance(message_id,int): return
-
-    if choice=="about":
-        about_text = (
-            "<b>➻ ᴍʏ ᴀʙᴏᴜᴛ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ</b>\n"
-            "• <b>ɴᴀᴍᴇ :</b> ᴢᴇxᴏɴ ᴍᴜꜱɪᴄ ʙᴏᴛ\n"
-            "• <b>ʜᴏᴍᴇ :</b> ᴘʏᴛʜᴏɴᴀɴʏᴡᴇʀᴇ\n"
-            "• <b>ʟᴀɴɢᴜᴀɢᴇ :</b> ᴘʏᴛʜᴏɴ ᴇɴɢʟɪꜱʜ\n"
-            "• <b>ꜱᴇʀᴠᴇʀ :</b> ᴘʏᴛʜᴏɴ ᴠᴇʀꜱɪᴏɴ\n\n"
-        )
-        await edit_message(client, chat_id, message_id, about_text, keyboard=back_keyboard())
-        return
-
-    if choice=="help":
-        help_text = "📖 <b>Help Guide:</b>\n\n<i>Simply send any YouTube, Instagram or Facebook link, then select Audio or Thumbnail!</i>\n\n<b>Contact:</b> <code>@zexon_x</code>"
-        await edit_message(client, chat_id, message_id, help_text, keyboard=back_keyboard())
-        return
-
-    if choice=="home":
-        first_name = callback_user.get("first_name") or "दोस्त"
-        home_text = (
-            f"<b>𝐇ɪ, {first_name} ✨</b> \n\n"
-            "<i>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ɪɴꜱᴛᴀɢʀᴀᴍ ꜰᴀᴄᴇʙᴏᴋ ᴍᴜꜱɪᴄ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴅᴏᴡɴʟᴏᴀᴅ ʙᴏᴛ</i>\n"
-            "<i>ᴡᴇ ꜱᴀᴠᴇ ᴍᴜꜱɪᴄ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏʀᴍ ɪɴꜱᴛᴀɢʀᴀᴍ ꜰᴀᴄᴇʙᴏᴏᴋ ꜱᴏᴄɪᴀʟ ᴍᴇᴅɪᴀ</i>\n"
-            "<i>ɪꜰ ʏᴏᴜ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ʟɪɴᴋ ᴀɴᴅ ɢᴇᴛ ᴍᴜꜱɪᴄ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴀꜱᴛ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i>\n\n"
-            "ꜱᴛʏʟɪꜱʜ ᴍᴀɪɴᴛᴇɴᴇᴅ : ᴢᴇxᴏɴ"
-        )
-        await edit_message(client, chat_id, message_id, home_text, keyboard=start_keyboard())
-        return
-
-    if choice=="close":
-        await delete_message(client, chat_id, message_id)
-        return
-
-    url=LAST_URLS.get(chat_id)
-    if not url: await edit_message(client,chat_id,message_id,"<i>Send supported Link 🔗</i>"); return
-
-    if choice=="thumb":
-        await edit_message(client,chat_id,message_id,"Downloading...⏳")
-        try:
-            thumbnail,title=await asyncio.to_thread(extract_thumbnail,url)
-            if not thumbnail: raise ValueError("thumbnail_missing")
-            await send_photo(client,chat_id,thumbnail)
-            if isinstance(callback_user,dict): await asyncio.to_thread(safe_record_user,callback_user,True)
-            await delete_message(client,chat_id,message_id)
-        except Exception:
-            logger.exception("Thumb fail"); await edit_message(client,chat_id,message_id,"<b>download Failed! ❌</b>")
-        return
-
-    if choice!="music": return
-    await edit_message(client,chat_id,message_id,"Downloading...⏳")
+    original_name = file.file_name or "unknown_file"
+    _, ext = os.path.splitext(original_name)
+    
+    analysing_msg = await message.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...</b>", quote=True)
+    await asyncio.sleep(1)
     try:
-        with tempfile.TemporaryDirectory(prefix="zexon-") as directory:
-            audio_path,title=await asyncio.to_thread(download_audio,url,directory)
-            await send_audio(client,chat_id,audio_path,title)
-            if isinstance(callback_user,dict): await asyncio.to_thread(safe_record_user,callback_user,True)
-        await delete_message(client,chat_id,message_id)
-    except ValueError as error:
-        msg="<i>this audio Telegram size limit For Big</i>" if str(error)=="audio_too_large" else "<b>Audio Download Failed ❌</b>"
-        await edit_message(client,chat_id,message_id,msg)
-    except Exception:
-        logger.exception("Audio fail"); await edit_message(client,chat_id,message_id,"<b>Audio download Failed send Link public content ❌</b>")
+        info_msg = await analysing_msg.edit_text(f"<blockquote><b>𝐅ɪʟᴇ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ  :</b>\n<b> ɴᴀᴍᴇ :</b> <code>{original_name}</code>\n<b> ꜰɪʟᴇ ꜱɪᴢᴇ :</b> {stylish_number(humanbytes(file.file_size))} ᴍʙ</blockquote>\n<blockquote> <i><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ  ɴᴇᴡ  ɴᴀᴍᴇ </b></i></blockquote>")
+    except:
+        info_msg = analysing_msg
 
-async def handle_update(client: Any, update: dict[str, Any]) -> None:
-    if isinstance(update.get("message"),dict): await handle_message(client,update["message"])
-    elif isinstance(update.get("callback_query"),dict): await handle_callback(client,update["callback_query"])
+    user_data[message.from_user.id] = {"media_message": message, "ext": ext, "info_msg": info_msg}
 
-async def poll_updates() -> None:
-    offset=0
-    bot=await telegram_request(None,"getMe")
-    logger.info("Started as @%s", bot.get("username","unknown"))
-    await telegram_request(None,"deleteWebhook",data={"drop_pending_updates":"false"})
-    while True:
-        try:
-            updates=await telegram_request(None,"getUpdates",data={"offset":str(offset),"timeout":"25","allowed_updates":json.dumps(["message","callback_query"])},timeout=35)
-            for update in updates or []:
-                offset=max(offset,int(update["update_id"])+1); await handle_update(None,update)
-        except Exception as e:
-            logger.warning(f"Polling error: {e}")
-            await asyncio.sleep(5)
+@app.on_message(filters.text & ~filters.command(["start", "status"]))
+async def handle_new_name(client: Client, message: Message):
+    global total_renamed_files
+    user_id = message.from_user.id
+    if user_id not in user_data:
+        return
+    data = user_data.pop(user_id)
+    media_msg = data["media_message"]
+    ext = data["ext"]
+    info_msg = data["info_msg"]
+    new_name = message.text.strip()
+    if not new_name.endswith(ext):
+        new_name += ext
 
-def main() -> None:
-    if not TOKEN or "BOT TOKEN" in TOKEN: raise SystemExit("BOT_TOKEN env missing")
-    init_user_store(); asyncio.run(poll_updates())
+    status_msg = await media_msg.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...</b>", quote=True)
+    
+    try: await message.delete()
+    except: pass
+    try: await info_msg.delete()
+    except: pass
+    
+    if not os.path.exists("downloads"):
+        os.makedirs("downloads")
 
-if __name__=="__main__": main()
+    start_time = time.time()
+    last_edit = {"time": start_time, "last_text": ""}
+    
+    file_path = None
+    try:
+        file_path = await media_msg.download(file_name=f"downloads/{new_name}", progress=progress_for_pyrogram, progress_args=(status_msg, start_time, "Download", last_edit))
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Download failed: {e}")
+        return
+
+    try: await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>")
+    except: pass
+    await asyncio.sleep(1)
+    
+    start_time = time.time()
+    last_edit["time"] = 0
+    last_edit["last_text"] = ""
+    
+    try:
+        sent_doc = await media_msg.reply_document(document=file_path, file_name=new_name, force_document=True, progress=progress_for_pyrogram, progress_args=(status_msg, start_time, "Upload", last_edit), quote=True)
+    except Exception as e:
+        try: await status_msg.edit_text(f"❌ Upload failed: {e}")
+        except: pass
+        return
+    finally:
+        try: await status_msg.delete()
+        except: pass
+        if file_path and os.path.exists(file_path): 
+            try: os.remove(file_path)
+            except: pass
+        gc.collect()
+        
+    total_renamed_files += 1
+
+if __name__ == "__main__":
+    print("Bot Running Perfectly...")
+    app.run()
