@@ -39,7 +39,7 @@ async def progress_for_pyrogram(current, total, status_message, start_time, acti
     now = time.time()
     
     # 2 sec cooldown
-    if (now - last_edit_holder["time"] < 2.0) and current != total:
+    if (now - last_edit_holder["time"] < 10.0) and current != total:
         return
         
     last_edit_holder["time"] = now
