@@ -1,3 +1,2 @@
-python-telegram-bot
-aiohttp
-requests
+pyrofork
+tgcrypto
