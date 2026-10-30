@@ -1,206 +1,249 @@
 import asyncio
 import os
-import time
-import gc
+import yt_dlp
 from pyrogram import Client, filters
+from pyrogram.enums import ChatAction
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from pyrogram.errors import MessageNotModified, FloodWait
 
 API_ID = 33208732  
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
-ADMIN_ID = 8562470788  
+BOT_TOKEN = "8858460950:AAEnvrMq_XiYSyoAhPRZG8uZam1H-lBLH3M"
+ADMIN_ID = 8562470788
+
+REQUIREMENTS_CHANNEL = -1004334558910
+UPDATE_CHANNEL_USERNAME = "zexon_Bot_updates"
+UPDATE_CHANNEL_INVITE = "https://t.me/zexon_Bot_updates"
 
 app = Client(
-    "zexon_renamer_bot", 
+    "zexon_yt_downloader_bot", 
     api_id=API_ID, 
     api_hash=API_HASH, 
     bot_token=BOT_TOKEN,
     workdir="./",
-    workers=32,
-    max_concurrent_transmissions=20,
-    ipv6=False
+    workers=16
 )
 
-user_data = {}
-registered_users = set()
-total_renamed_files = 0
+user_yt_links = {}
+START_TEXT = (
+    "<b>𝐇ɪ {name} ✨</b>\n\n"
+    "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ʏᴏᴜ ᴛᴜʙᴇ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ ʙᴏᴛ</b></blockquote>\n"
+    "<blockquote><b>ᴡᴇ ᴄᴀɴ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅ ʏᴏᴜ ᴛᴜʙᴇ ᴀᴜᴅɪᴏ ᴀɴᴅ ᴠɪᴅᴇᴏ ꜱᴇᴄᴜʀᴇ, ꜱᴇɴᴅ ᴍᴇ ʏᴏᴜ ᴛᴜʙᴇ ᴠɪᴅᴇᴏ ʟɪɴᴋ ᴀɴᴅ ɢɪᴠᴇ ʏᴏᴜ ᴏᴘᴛɪᴏɴꜱ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ᴀᴜᴅɪᴏ ᴀɴᴅ ᴠɪᴅᴇᴏ, ᴡʜᴇɴ ʏᴏᴜ ᴄʜᴏᴏꜱɪɴɢ ʏᴏᴜʀ ᴠɪᴅᴇᴏ ᴀᴜᴅɪᴏ ꜰᴏʀᴍᴀᴛ ᴛʜᴇɴ ᴡᴇ ᴅᴏᴡɴʟᴏᴀᴅ ꜰʀᴏᴍ ʏᴏᴜʀ ᴄʜᴏɪᴄᴇ ᴀɴᴅ ɢɪᴠᴇ ʏᴏᴜ ᴠɪᴅᴇᴏ ᴀᴜᴅɪᴏ ɪɴꜱᴛᴀɴᴛʟʏ.</b></blockquote>\n"
+    "<blockquote><b>ɪꜰ ʏᴏᴜ ᴀʀᴇ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ</b></blockquote>"
+)
 
-def humanbytes(size):
-    if not size: 
-        return "0.00"
-    return f"{size / (1024*1024):.2f}"
+def save_user(user):
+    try:
+        users_file = "users.txt"
+        user_id = str(user.id)
+        existing_users = set()
+        if os.path.exists(users_file):
+            with open(users_file, "r", encoding="utf-8") as f:
+                existing_users = set(f.read().splitlines())
+        if user_id not in existing_users:
+            with open(users_file, "a", encoding="utf-8") as f:
+                f.write(f"{user_id}\n")
+    except Exception:
+        pass
 
-def stylish_number(text):
-    m = {'0':'𝟶','1':'𝟷','2':'𝟸','3':'𝟹','4':'𝟺','5':'𝟻','6':'𝟼','7':'𝟽','8':'𝟾','9':'𝟿','.':'.', '%':'%'}
-    return ''.join(m.get(c, c) for c in str(text))
+def log_history(user, action_type, title, link):
+    try:
+        history_file = "download_history.txt"
+        name = f"{user.first_name} {user.last_name or ''}".strip()
+        log_entry = f"User: {name} (ID: {user.id}) | Action: {action_type} | Title: {title} | Link: {link}\n"
+        with open(history_file, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception:
+        pass
 
-async def progress_for_pyrogram(current, total, status_message, start_time, action_type, last_edit_holder):
-    now = time.time()
-    
-    # 2 sec cooldown
-    if (now - last_edit_holder["time"] < 10.0) and current != total:
+# --- YAHI MAIN FIX HAI ---
+async def check_subscription(client, user_id):
+    try:
+        user_member = await client.get_chat_member(UPDATE_CHANNEL_USERNAME, user_id)
+        print(f"User Status: {user_member.status}")
+        status = str(user_member.status).lower()
+        # left / kicked nahi hai to allow hai (owner, admin, member sab)
+        if "left" not in status and "kicked" not in status:
+            return True
+        return False
+    except Exception as e:
+        print(f"F-Sub Check Error: {e}")
+        return False
+
+@app.on_message(filters.command("start") & filters.incoming)
+async def start(client: Client, message: Message):
+    user = message.from_user
+    save_user(user)
+    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+    if not await check_subscription(client, user.id):
+        join_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("ᴊᴏɪɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ 📢", url=UPDATE_CHANNEL_INVITE)],
+            [InlineKeyboardButton("ᴛʀʏ ᴀɢᴀɪɴ 🔄", callback_data="check_sub")]
+        ])
+        await message.reply_text(
+            "<b>ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ ⚠️\n\nᴅᴇᴀʀ, ᴘʟᴇᴀꜱᴇ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ, ᴛʜᴇɴ ᴄʟɪᴄᴋ 'ᴛʀʏ ᴀɢᴀɪɴ'.</b>",
+            reply_markup=join_markup
+        )
         return
-        
-    last_edit_holder["time"] = now
-    diff = now - start_time
-    if diff <= 0: 
-        diff = 1
-        
-    percentage = (current * 100 / total) if total and total > 0 else 0
-    speed = current / diff
-    
-    if speed > 0:
-        eta = int((total - current) / speed)
-    else:
-        eta = 0
-
-    filled = min(14, int(percentage * 14 / 100))
-    bar = "▣" * filled + "▢" * (14 - filled)
-    head = "<b>ꜱᴛᴀᴛᴜꜱ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</b>\n" if "Download" in action_type else "<b>ꜱᴛᴀᴛᴜꜱ ᴜᴘʟᴏᴀᴅɪɴɢ :</b>\n"
-    
-    text = (
-        f"{head}\n{bar}\n\n"
-        f"<blockquote><b>ꜱɪᴢxᴇ :</b> {stylish_number(humanbytes(total))} ᴍʙ\n"
-        f"<b>ᴅᴏɴᴇ :</b> {stylish_number(humanbytes(current))} ᴍʙ\n"
-        f"<b>ꜱᴘᴇᴇᴅ :</b> {stylish_number(humanbytes(speed))} ᴍʙ\n"
-        f"<b>ʟᴇꜰᴛ ᴇᴛᴀ :</b> {stylish_number(eta)} ꜱ</blockquote>\n\n<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @Rename_zexon_Bot</blockquote>"
+    await message.reply_text(
+        text=START_TEXT.format(name=user.first_name),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ 🔊", url=UPDATE_CHANNEL_INVITE),
+             InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ 💬", url="https://t.me/URL_Save_Bot")]
+        ]),
+        disable_web_page_preview=True
     )
 
-    # MAIN FIX - Same text ko edit karne se rokega
-    if last_edit_holder.get("last_text") == text:
+@app.on_message(filters.command("stats") & filters.user(ADMIN_ID) & filters.incoming)
+async def stats(client: Client, message: Message):
+    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+    users_file = "users.txt"
+    total_users = 0
+    if os.path.exists(users_file):
+        with open(users_file, "r", encoding="utf-8") as f:
+            total_users = len(f.read().splitlines())
+    await message.reply_text(f"<b>📊 Bot Statistics:\n\n👥 Total Unique Users: <code>{total_users}</code></b>")
+
+@app.on_message(filters.text & (filters.regex(r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.+")) & filters.incoming)
+async def youtube_link_handler(client: Client, message: Message):
+    user = message.from_user
+    save_user(user)
+    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+    if not await check_subscription(client, user.id):
+        join_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("ᴊᴏɪɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ 📢", url=UPDATE_CHANNEL_INVITE)],
+            [InlineKeyboardButton("ᴛʀʏ ᴀɢᴀɪɴ 🔄", callback_data="check_sub")]
+        ])
+        await message.reply_text(
+            "<b>ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ ⚠️</b>\n\n<b>ᴘʟᴇᴀꜱᴇ ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ, ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴏɴ 'ᴛʀʏ ᴀɢᴀɪɴ'</b> 🤨",
+            reply_markup=join_markup
+        )
         return
-    last_edit_holder["last_text"] = text
-
-    try: 
-        await status_message.edit_text(text)
-    except MessageNotModified:
-        pass
-    except FloodWait as e:
-        await asyncio.sleep(e.value)
-    except Exception: 
-        pass
-
-START_TEXT = (
-    "<b>𝐇ɪ {name}</b>\n\n"
-    "<blockquote><b>𝐖ᴇʟᴄᴏᴍᴇ 𝐓ᴏ 𝐀ᴅᴠᴀɴᴄᴇ 𝐑ᴇɴᴀᴍᴇ 𝐁ᴏᴛ</b></blockquote>\n"
-    "<blockquote><i>ᴡᴇ ᴀʀᴇ ᴀᴅᴠᴀɴᴄᴇ ᴀɴᴅ ᴀʟᴍᴏꜱᴛ ꜰᴀꜱᴛ ꜰɪʟᴇ ʀᴇɴᴀᴍᴇ ʙᴏᴛ ᴡɪᴛʜ ʟᴀʀɢᴇʀ ꜱɪᴢᴇ ꜱᴜᴘᴘᴏʀᴛ ꜰɪʟᴇ ᴍᴀxɪᴍᴜᴍ ꜰɪᴠᴇ ʜᴜɴᴅʀᴇᴅ, ᴡᴇ ᴄᴀɴ ꜰᴀꜱᴛ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ, ɪꜰ ʏᴏᴜ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ ᴛʜᴇɴ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ᴏꜰ ʏᴏᴜʀ ꜰɪʟᴇ ᴀɴᴅ ɢᴇᴛ ʏᴏᴜʀ ʀᴇɴᴀᴍᴇᴅ ꜰɪʟᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
-    "<blockquote><b>ᴛʜᴇ ᴍᴀɪɴᴛᴇɴᴇᴅ ʙʏ : ᴢᴇxᴏɴ ᴘᴀᴠᴀɴ</b></blockquote>"
-)
-
-START_KEYBOARD = InlineKeyboardMarkup([
-    [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates"), InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot")],
-    [InlineKeyboardButton("ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/zexon_x")],
-    [InlineKeyboardButton("ᴀʙᴏᴜᴛ", callback_data="about_btn"), InlineKeyboardButton("ʜᴇʟᴘ", callback_data="help_btn")],
-    [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_btn")]
-])
-
-@app.on_message(filters.command("start"))
-async def start(client: Client, message: Message):
-    registered_users.add(message.from_user.id)
-    await message.reply_text(text=START_TEXT.format(name=message.from_user.first_name), reply_markup=START_KEYBOARD, disable_web_page_preview=True, quote=True)
+    url = message.text.strip()
+    status_msg = await message.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳</b>")
+    loop = asyncio.get_event_loop()
+    def fetch_info_with_cookie(use_cookie=False):
+        ydl_opts = {'quiet': True}
+        if use_cookie and os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(url, download=False)
+    try:
+        info = None
+        try:
+            info = await loop.run_in_executor(None, lambda: fetch_info_with_cookie(use_cookie=False))
+        except Exception:
+            info = await loop.run_in_executor(None, lambda: fetch_info_with_cookie(use_cookie=True))
+        title = info.get('title', 'YouTube Video')
+        thumbnail = info.get('thumbnail', 'https://ibb.co/6R0590P') 
+        duration = info.get('duration', 0)
+        user_yt_links[user.id] = url
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("𝙰𝚄𝙳𝙸𝙾 🎵", callback_data="dl_audio"),
+             InlineKeyboardButton("𝚅𝙸𝙳𝙴𝙾 🎬", callback_data="dl_video")],
+            [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_btn")]
+        ])
+        caption = f"<b>🎬 {title}</b>\n\n<b>ᴅᴜʀᴀᴛɪᴏɴ :</b> <code>{duration} ꜱᴇᴄᴏɴᴅꜱ</code>\n\n<b><i>ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴅᴏᴡɴʟᴏᴀᴅ ꜰᴏʀᴍᴀᴛ :</i></b>"
+        await status_msg.delete()
+        await client.send_chat_action(message.chat.id, ChatAction.UPLOAD_PHOTO)
+        await message.reply_photo(photo=thumbnail, caption=caption, reply_markup=keyboard)
+    except Exception as e:
+        await status_msg.edit_text(f"❌ **Failed to fetch video:** `{e}`")
 
 @app.on_callback_query()
 async def callback_handler(client: Client, callback_query: CallbackQuery):
     data = callback_query.data
-    try:
-        if data == "about_btn":
-            about_text = "╭━━━━━━━━━━━━━━━━━➣\n┣⪼ <b><u>ʜᴇʀᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ</u></b>\n┣⪼ ɴᴀᴍᴇ : ʀᴇɴᴀᴍᴇʀ ᴢᴇxᴏɴ ʙᴏᴛ\n┣⪼ ʜᴏᴍᴇ : ꜱɪʟʟʏ ᴅᴇᴠᴇʟᴏᴘᴍᴇɴᴛ\n┣⪼ ʟᴀɴɢᴜᴀɢᴇ : ᴘʏᴛʜᴏɴ ᴇɴɢʟɪꜱʜ\n┣⪼ ᴛʜᴇ god : ᴍʀ ᴢᴇxᴏɴ ᴘᴀᴠᴀɴ\n┣⪼ ʜᴇʟᴘ ᴄᴏɴɴᴇᴄᴛ : @zexon_x\n╰━━━━━━━━━━━━━━━━━➣"
-            await callback_query.message.edit_text(text=about_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="back_btn")]]))
-        elif data == "help_btn":
-            help_text = "<b><u>ʜᴏᴡ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇ :</u></b>\n𝟷. ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ᴀɴʏ ꜰɪʟᴇ\n𝟸. ᴛʜᴇɴ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ\n𝟹. ᴡᴀɪᴛ ꜱᴀᴍᴇ ᴛɪᴍᴇ ꜰᴏʀ ʀᴇɴᴀᴍɪɴɢ\n𝟺. ᴘʟᴇᴀꜱᴇ ᴅᴏɴ'ᴛ ꜱᴇɴᴅ ʙɪɢ ꜰɪʟᴇ"
-            await callback_query.message.edit_text(text=help_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="back_btn")]]))
-        elif data == "main_menu" or data == "back_btn":
-            await callback_query.message.edit_text(text=START_TEXT.format(name=callback_query.from_user.first_name), reply_markup=START_KEYBOARD, disable_web_page_preview=True)
-        elif data == "close_btn":
-            await callback_query.message.delete()
-    except MessageNotModified:
-        pass
-    except Exception:
-        pass
-
-@app.on_message(filters.command("status") & filters.user(ADMIN_ID))
-async def bot_status(client: Client, message: Message):
-    await message.reply_text(f"📊 **Bot Live Status**\n\n👥 **Total Users:** `{len(registered_users)}`\n📁 **Total Renamed:** `{total_renamed_files}`", quote=True)
-
-@app.on_message(filters.document | filters.video | filters.audio)
-async def handle_file(client: Client, message: Message):
-    file = message.document or message.video or message.audio
-    registered_users.add(message.from_user.id)
-    max_limit = 1000 * 1024 * 1024
-    if (file.file_size or 0) > max_limit:
-        await message.reply_text("Big File Can't Download ⚠️", quote=True)
+    user_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
+    user = callback_query.from_user
+    if data == "close_btn":
+        try: await callback_query.message.delete()
+        except Exception: pass
         return
-    original_name = file.file_name or "unknown_file"
-    _, ext = os.path.splitext(original_name)
-    
-    analysing_msg = await message.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...</b>", quote=True)
-    await asyncio.sleep(1)
-    try:
-        info_msg = await analysing_msg.edit_text(f"<blockquote><b>𝐅ɪʟᴇ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ  :</b>\n<b> ɴᴀᴍᴇ :</b> <code>{original_name}</code>\n<b> ꜰɪʟᴇ ꜱɪᴢᴇ :</b> {stylish_number(humanbytes(file.file_size))} ᴍʙ</blockquote>\n<blockquote> <i><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ  ɴᴇᴡ  ɴᴀᴍᴇ </b></i></blockquote>")
-    except:
-        info_msg = analysing_msg
-
-    user_data[message.from_user.id] = {"media_message": message, "ext": ext, "info_msg": info_msg}
-
-@app.on_message(filters.text & ~filters.command(["start", "status"]))
-async def handle_new_name(client: Client, message: Message):
-    global total_renamed_files
-    user_id = message.from_user.id
-    if user_id not in user_data:
+    if data == "check_sub":
+        await client.send_chat_action(chat_id, ChatAction.TYPING)
+        if await check_subscription(client, user_id):
+            await callback_query.message.edit_text("<b>ᴄᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴꜱ 🎉\n\nᴛʜᴀɴᴋ ʏᴏᴜ ꜰᴏʀ ᴊᴏɪɴɪɴɢ ᴍʏ ᴄʜᴀɴɴᴇʟ ɴᴏᴡ ʏᴏᴜ ꜱᴛᴀʀᴛ ᴀɢᴀɪɴ ᴀɴᴅ ᴄᴏɴᴛɪɴᴜᴇ</b>")
+        else:
+            await callback_query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴍʏ ᴄʜᴀɴɴᴇʟ ❌", show_alert=True)
         return
-    data = user_data.pop(user_id)
-    media_msg = data["media_message"]
-    ext = data["ext"]
-    info_msg = data["info_msg"]
-    new_name = message.text.strip()
-    if not new_name.endswith(ext):
-        new_name += ext
-
-    status_msg = await media_msg.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...</b>", quote=True)
-    
-    try: await message.delete()
-    except: pass
-    try: await info_msg.delete()
-    except: pass
-    
-    if not os.path.exists("downloads"):
-        os.makedirs("downloads")
-
-    start_time = time.time()
-    last_edit = {"time": start_time, "last_text": ""}
-    
-    file_path = None
-    try:
-        file_path = await media_msg.download(file_name=f"downloads/{new_name}", progress=progress_for_pyrogram, progress_args=(status_msg, start_time, "Download", last_edit))
-    except Exception as e:
-        await status_msg.edit_text(f"❌ Download failed: {e}")
+    if not await check_subscription(client, user_id):
+        await callback_query.answer("ᴘʟᴇᴀꜱᴇ ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ ⚠️", show_alert=True)
         return
-
-    try: await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>")
-    except: pass
-    await asyncio.sleep(1)
-    
-    start_time = time.time()
-    last_edit["time"] = 0
-    last_edit["last_text"] = ""
-    
-    try:
-        sent_doc = await media_msg.reply_document(document=file_path, file_name=new_name, force_document=True, progress=progress_for_pyrogram, progress_args=(status_msg, start_time, "Upload", last_edit), quote=True)
-    except Exception as e:
-        try: await status_msg.edit_text(f"❌ Upload failed: {e}")
-        except: pass
+    if user_id not in user_yt_links:
+        await callback_query.answer("Session expired Please send the YouTube link again.", show_alert=True)
         return
-    finally:
-        try: await status_msg.delete()
-        except: pass
-        if file_path and os.path.exists(file_path): 
-            try: os.remove(file_path)
-            except: pass
-        gc.collect()
-        
-    total_renamed_files += 1
+    url = user_yt_links[user_id]
+    if data == "dl_audio":
+        await callback_query.answer("Please wait Downloading...", show_alert=False)
+        await client.send_chat_action(chat_id, ChatAction.TYPING)
+        status_msg = await callback_query.message.reply_text("<b>𝐍ᴏᴡ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...⏳</b>")
+        if not os.path.exists("downloads"): os.makedirs("downloads")
+        file_path = None
+        try:
+            loop = asyncio.get_event_loop()
+            def download_audio_with_cookie(use_cookie=False):
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': 'downloads/%(id)s.%(ext)s',
+                    'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
+                }
+                if use_cookie and os.path.exists('cookies.txt'): ydl_opts['cookiefile'] = 'cookies.txt'
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    return ydl.prepare_filename(info).rsplit(".", 1)[0] + ".mp3", info.get('title', 'Audio'), info.get('uploader', 'Unknown')
+            try: file_path, title, uploader = await loop.run_in_executor(None, lambda: download_audio_with_cookie(use_cookie=False))
+            except Exception: file_path, title, uploader = await loop.run_in_executor(None, lambda: download_audio_with_cookie(use_cookie=True))
+            log_history(user, "AUDIO", title, url)
+            await status_msg.edit_text("<b>𝐍ᴏᴡ ᴜᴘʟᴏᴀᴅɪɴɢ...⏳</b>")
+            await client.send_chat_action(chat_id, ChatAction.UPLOAD_AUDIO)
+            await client.send_audio(chat_id=chat_id, audio=file_path, title=title, performer=uploader, caption=f"<b>🎵 {title}</b>\n\n<b><blockquote>𝐏ᴏᴡᴇʀᴇᴅ : @zexon_You_tube_saver_Bot</blockquote></b>")
+            await status_msg.delete()
+        except Exception as e: await status_msg.edit_text(f"❌ **Audio Download Failed:** `{e}`")
+        finally:
+            if file_path and os.path.exists(file_path):
+                try: os.remove(file_path)
+                except Exception: pass
+    elif data == "dl_video":
+        await callback_query.answer("Please wait Downloading...", show_alert=False)
+        await client.send_chat_action(chat_id, ChatAction.TYPING)
+        status_msg = await callback_query.message.reply_text("<b>𝐍ᴏᴡ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...⏳</b>")
+        if not os.path.exists("downloads"): os.makedirs("downloads")
+        if "shorts" in url: strict_format = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4] / best'
+        else: strict_format = 'bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480][ext=mp4] / best'
+        formats_to_try = [strict_format, 'best']
+        file_path = None; success = False; last_error = None; title = "Video"; duration = 0
+        loop = asyncio.get_event_loop()
+        for current_format in formats_to_try:
+            for use_cookie in [False, True]:
+                try:
+                    def download_video():
+                        ydl_opts = {'format': current_format,'outtmpl': 'downloads/%(id)s.%(ext)s','max_filesize': 500 * 1024 * 1024,'merge_output_format': 'mp4'}
+                        if use_cookie and os.path.exists('cookies.txt'): ydl_opts['cookiefile'] = 'cookies.txt'
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            info = ydl.extract_info(url, download=True)
+                            return ydl.prepare_filename(info), info.get('title', 'Video'), info.get('duration', 0)
+                    file_path, title, duration = await loop.run_in_executor(None, download_video)
+                    success = True; break
+                except Exception as e: last_error = e; continue
+            if success: break
+        if success and file_path:
+            log_history(user, "VIDEO", title, url)
+            try:
+                await status_msg.edit_text("<b>𝐍ᴏᴡ ᴜᴘʟᴏᴀᴅɪɴɢ...⏳</b>")
+                await client.send_chat_action(chat_id, ChatAction.UPLOAD_VIDEO)
+                await client.send_video(chat_id=chat_id, video=file_path, caption=f"<b>{title}</b>\n\n<b><blockquote>𝐏ᴏᴡᴇʀᴇᴅ : @zexon_You_tube_saver_Bot</blockquote></b>", duration=duration, supports_streaming=True)
+                await status_msg.delete()
+            except Exception as e: await status_msg.edit_text(f"❌ **Upload Failed:** `{e}`")
+            finally:
+                if file_path and os.path.exists(file_path):
+                    try: os.remove(file_path)
+                    except Exception: pass
+        else:
+            await status_msg.edit_text(f"❌ **Video Download Failed:** `{last_error}`")
+            if file_path and os.path.exists(file_path):
+                try: os.remove(file_path)
+                except Exception: pass
 
 if __name__ == "__main__":
-    print("Bot Running Perfectly...")
+    print("YouTube Downloader Bot Running...")
     app.run()
