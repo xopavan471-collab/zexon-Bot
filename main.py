@@ -1,249 +1,513 @@
 import asyncio
+import gc
+import json
+import math
 import os
-import yt_dlp
-from pyrogram import Client, filters
-from pyrogram.enums import ChatAction
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+import random
+import re
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from bs4 import BeautifulSoup
+from pyrogram import Client, filters, idle
+from pyrogram.enums import ParseMode, ChatMemberStatus
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.raw import types
+import requests
 
-API_ID = 33208732  
+# --- CONFIG ---
+API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "MEWWWW GHOP GHOP 😂"
+BOT_TOKEN = "9091943258:AAH4QKu5MJ3Tg4ZTThBAUi7GR-xO6fl1BiQ"
 ADMIN_ID = 8562470788
 
-REQUIREMENTS_CHANNEL = -1004334558910
-UPDATE_CHANNEL_USERNAME = "zexon_Bot_updates"
-UPDATE_CHANNEL_INVITE = "https://t.me/zexon_Bot_updates"
+REQUIRED_CHANNEL = -1004334558910
+CHANNEL_URL = "https://t.me/zexon_Bot_updates"
 
-app = Client(
-    "zexon_yt_downloader_bot", 
-    api_id=API_ID, 
-    api_hash=API_HASH, 
-    bot_token=BOT_TOKEN,
-    workdir="./",
-    workers=16
-)
+# Host Crash Protect Cap (Optimized for 500MB - 800MB files)
+MEDIAFIRE_MAX_SIZE = 460 * 1024 * 1024
+DIRECT_MAX_SIZE = 460 * 1024 * 1024
 
-user_yt_links = {}
-START_TEXT = (
-    "<b>𝐇ɪ {name} ✨</b>\n\n"
-    "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ʏᴏᴜ ᴛᴜʙᴇ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ ʙᴏᴛ</b></blockquote>\n"
-    "<blockquote><b>ᴡᴇ ᴄᴀɴ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅ ʏᴏᴜ ᴛᴜʙᴇ ᴀᴜᴅɪᴏ ᴀɴᴅ ᴠɪᴅᴇᴏ ꜱᴇᴄᴜʀᴇ, ꜱᴇɴᴅ ᴍᴇ ʏᴏᴜ ᴛᴜʙᴇ ᴠɪᴅᴇᴏ ʟɪɴᴋ ᴀɴᴅ ɢɪᴠᴇ ʏᴏᴜ ᴏᴘᴛɪᴏɴꜱ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ᴀᴜᴅɪᴏ ᴀɴᴅ ᴠɪᴅᴇᴏ, ᴡʜᴇɴ ʏᴏᴜ ᴄʜᴏᴏꜱɪɴɢ ʏᴏᴜʀ ᴠɪᴅᴇᴏ ᴀᴜᴅɪᴏ ꜰᴏʀᴍᴀᴛ ᴛʜᴇɴ ᴡᴇ ᴅᴏᴡɴʟᴏᴀᴅ ꜰʀᴏᴍ ʏᴏᴜʀ ᴄʜᴏɪᴄᴇ ᴀɴᴅ ɢɪᴠᴇ ʏᴏᴜ ᴠɪᴅᴇᴏ ᴀᴜᴅɪᴏ ɪɴꜱᴛᴀɴᴛʟʏ.</b></blockquote>\n"
-    "<blockquote><b>ɪꜰ ʏᴏᴜ ᴀʀᴇ ʀᴇᴀᴅʏ ᴊᴜꜱᴛ ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ</b></blockquote>"
-)
+# --- REACTION EMOJIS LIST ---
+REACTION_EMOJIS = ["🎉", "🥺", "😅", "⚡", "😊", "🙏", "🔥", "😍", "😘", "😐", "😌", "😃", "😂", "😭", "🙃", "🤭", "🤨", "😈", "👻", "👍"]
 
-def save_user(user):
+USERS_FILE = "users.json"
+executor = ThreadPoolExecutor(max_workers=2)
+
+# --- USER STATES & COOLDOWNS ---
+USER_RENAME_STATES = {}
+USER_COOLDOWNS = {}
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
+    return set()
+
+def save_users(s):
     try:
-        users_file = "users.txt"
-        user_id = str(user.id)
-        existing_users = set()
-        if os.path.exists(users_file):
-            with open(users_file, "r", encoding="utf-8") as f:
-                existing_users = set(f.read().splitlines())
-        if user_id not in existing_users:
-            with open(users_file, "a", encoding="utf-8") as f:
-                f.write(f"{user_id}\n")
+        with open(USERS_FILE, "w") as f:
+            json.dump(list(s), f)
     except Exception:
         pass
 
-def log_history(user, action_type, title, link):
-    try:
-        history_file = "download_history.txt"
-        name = f"{user.first_name} {user.last_name or ''}".strip()
-        log_entry = f"User: {name} (ID: {user.id}) | Action: {action_type} | Title: {title} | Link: {link}\n"
-        with open(history_file, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-    except Exception:
-        pass
+users_set = load_users()
+def add_user(uid):
+    if uid not in users_set:
+        users_set.add(uid)
+        save_users(users_set)
 
-# --- YAHI MAIN FIX HAI ---
-async def check_subscription(client, user_id):
+# --- HELPER FUNCTIONS ---
+def get_random_emoji():
+    return random.choice(REACTION_EMOJIS)
+
+def human_readable_size(b):
+    if not b: return "0 MB"
+    n = ("B", "KB", "MB", "GB")
+    i = int(math.floor(math.log(b, 1024))) if b > 0 else 0
+    p = math.pow(1024, i)
+    return f"{round(b/p, 2)} MB" if i <= 2 else f"{round(b/p, 2)} GB"
+
+def get_progress_bar(p):
+    t = 16
+    if p >= 99.5:
+        return "▣" * t
+    c = int((p / 100) * t)
+    c = min(max(c, 0), t - 1)
+    return "▣" * c + "▢" * (t - c)
+
+def format_eta(seconds):
+    if seconds <= 0:
+        return "0 S"
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    if mins > 0:
+        return f"{secs} S"
+    return f"{secs} S"
+
+def safe_remove(p):
     try:
-        user_member = await client.get_chat_member(UPDATE_CHANNEL_USERNAME, user_id)
-        print(f"User Status: {user_member.status}")
-        status = str(user_member.status).lower()
-        # left / kicked nahi hai to allow hai (owner, admin, member sab)
-        if "left" not in status and "kicked" not in status:
+        if p and os.path.exists(p):
+            os.remove(p)
+            print(f"Cleaned up file: {p}")
+    except Exception as e:
+        print(f"File Cleanup Error: {e}")
+    finally:
+        gc.collect()
+
+async def check_join(client, user_id):
+    try:
+        member = await client.get_chat_member(REQUIRED_CHANNEL, user_id)
+        if str(member.status) in ["ChatMemberStatus.MEMBER", "ChatMemberStatus.ADMINISTRATOR", "ChatMemberStatus.OWNER", "member", "administrator", "creator"]:
             return True
         return False
     except Exception as e:
-        print(f"F-Sub Check Error: {e}")
+        print(f"Check Join Error: {e}")
         return False
 
-@app.on_message(filters.command("start") & filters.incoming)
-async def start(client: Client, message: Message):
-    user = message.from_user
-    save_user(user)
-    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
-    if not await check_subscription(client, user.id):
-        join_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("ᴊᴏɪɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ 📢", url=UPDATE_CHANNEL_INVITE)],
-            [InlineKeyboardButton("ᴛʀʏ ᴀɢᴀɪɴ 🔄", callback_data="check_sub")]
-        ])
-        await message.reply_text(
-            "<b>ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ ⚠️\n\nᴅᴇᴀʀ, ᴘʟᴇᴀꜱᴇ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ, ᴛʜᴇɴ ᴄʟɪᴄᴋ 'ᴛʀʏ ᴀɢᴀɪɴ'.</b>",
-            reply_markup=join_markup
-        )
-        return
-    await message.reply_text(
-        text=START_TEXT.format(name=user.first_name),
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ 🔊", url=UPDATE_CHANNEL_INVITE),
-             InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ 💬", url="https://t.me/URL_Save_Bot")]
-        ]),
-        disable_web_page_preview=True
-    )
+def get_join_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Join channel 💠", url=CHANNEL_URL)],
+        [InlineKeyboardButton("Click to verify ✅", callback_data="check_joined")]
+    ])
 
-@app.on_message(filters.command("stats") & filters.user(ADMIN_ID) & filters.incoming)
-async def stats(client: Client, message: Message):
-    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
-    users_file = "users.txt"
-    total_users = 0
-    if os.path.exists(users_file):
-        with open(users_file, "r", encoding="utf-8") as f:
-            total_users = len(f.read().splitlines())
-    await message.reply_text(f"<b>📊 Bot Statistics:\n\n👥 Total Unique Users: <code>{total_users}</code></b>")
-
-@app.on_message(filters.text & (filters.regex(r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.+")) & filters.incoming)
-async def youtube_link_handler(client: Client, message: Message):
-    user = message.from_user
-    save_user(user)
-    await client.send_chat_action(message.chat.id, ChatAction.TYPING)
-    if not await check_subscription(client, user.id):
-        join_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("ᴊᴏɪɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ 📢", url=UPDATE_CHANNEL_INVITE)],
-            [InlineKeyboardButton("ᴛʀʏ ᴀɢᴀɪɴ 🔄", callback_data="check_sub")]
-        ])
-        await message.reply_text(
-            "<b>ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ ⚠️</b>\n\n<b>ᴘʟᴇᴀꜱᴇ ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ, ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴏɴ 'ᴛʀʏ ᴀɢᴀɪɴ'</b> 🤨",
-            reply_markup=join_markup
-        )
-        return
-    url = message.text.strip()
-    status_msg = await message.reply_text("<b>𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳</b>")
-    loop = asyncio.get_event_loop()
-    def fetch_info_with_cookie(use_cookie=False):
-        ydl_opts = {'quiet': True}
-        if use_cookie and os.path.exists('cookies.txt'):
-            ydl_opts['cookiefile'] = 'cookies.txt'
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            return ydl.extract_info(url, download=False)
-    try:
-        info = None
+def extract_mediafire_link(url):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"}
+    for _ in range(3):
         try:
-            info = await loop.run_in_executor(None, lambda: fetch_info_with_cookie(use_cookie=False))
-        except Exception:
-            info = await loop.run_in_executor(None, lambda: fetch_info_with_cookie(use_cookie=True))
-        title = info.get('title', 'YouTube Video')
-        thumbnail = info.get('thumbnail', 'https://ibb.co/6R0590P') 
-        duration = info.get('duration', 0)
-        user_yt_links[user.id] = url
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("𝙰𝚄𝙳𝙸𝙾 🎵", callback_data="dl_audio"),
-             InlineKeyboardButton("𝚅𝙸𝙳𝙴𝙾 🎬", callback_data="dl_video")],
-            [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_btn")]
-        ])
-        caption = f"<b>🎬 {title}</b>\n\n<b>ᴅᴜʀᴀᴛɪᴏɴ :</b> <code>{duration} ꜱᴇᴄᴏɴᴅꜱ</code>\n\n<b><i>ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴅᴏᴡɴʟᴏᴀᴅ ꜰᴏʀᴍᴀᴛ :</i></b>"
-        await status_msg.delete()
-        await client.send_chat_action(message.chat.id, ChatAction.UPLOAD_PHOTO)
-        await message.reply_photo(photo=thumbnail, caption=caption, reply_markup=keyboard)
-    except Exception as e:
-        await status_msg.edit_text(f"❌ **Failed to fetch video:** `{e}`")
+            r = requests.get(url, headers=headers, timeout=30)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                btn = soup.find("a", id="downloadButton") or soup.find("a", class_=re.compile("input|download", re.I)) or soup.find("a", href=re.compile("download.php"))
+                if btn and btn.get("href"):
+                    dlink = btn["href"]
+                    if dlink.startswith("//"): dlink = "https:" + dlink
+                    fname_div = soup.find("div", class_="filename")
+                    fname = fname_div.text.strip() if fname_div else dlink.split("/")[-1].split("?")[0]
+                    try:
+                        h = requests.head(dlink, headers=headers, allow_redirects=True, timeout=20)
+                        fsize = int(h.headers.get("content-length", 0))
+                    except Exception: fsize = 0
+                    return dlink, fsize, fname
+        except Exception as e:
+            print(f"MF Extract Error: {e}")
+            time.sleep(2)
+    return None, None, None
 
-@app.on_callback_query()
-async def callback_handler(client: Client, callback_query: CallbackQuery):
-    data = callback_query.data
-    user_id = callback_query.from_user.id
-    chat_id = callback_query.message.chat.id
-    user = callback_query.from_user
-    if data == "close_btn":
+def extract_devuploads_link(url):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"}
+    for _ in range(3):
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                data = {}
+                for input_tag in soup.find_all("input"):
+                    if input_tag.get("name"):
+                        data[input_tag.get("name")] = input_tag.get("value", "")
+
+                post_r = requests.post(url, data=data, headers=headers, timeout=30)
+                if post_r.status_code == 200:
+                    post_soup = BeautifulSoup(post_r.text, "html.parser")
+                    download_btn = post_soup.find("a", class_="download-btn") or post_soup.find("a", id="downloadbtn") or post_soup.find("a", href=re.compile("download"))
+                    if download_btn and download_btn.get("href"):
+                        dlink = download_btn["href"]
+                        fname = dlink.split("/")[-1].split("?")[0]
+                        try:
+                            h = requests.head(dlink, headers=headers, allow_redirects=True, timeout=20)
+                            fsize = int(h.headers.get("content-length", 0))
+                        except Exception: fsize = 0
+                        return dlink, fsize, fname
+        except Exception as e:
+            print(f"Devuploads Extract Error: {e}")
+            time.sleep(2)
+    return None, None, None
+
+app = Client("zexon_media_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+async def react_user_message(message):
+    try:
+        emoji = get_random_emoji()
+        try:
+            await message.react(emoji)
+        except Exception:
+            await app.send_reaction(
+                chat_id=message.chat.id,
+                message_id=message.id,
+                emoji=types.ReactionEmoji(emoticon=emoji)
+            )
+    except Exception as e:
+        print(f"Reaction Error: {e}")
+
+@app.on_message(filters.command("start"))
+async def start_cmd(client, message):
+    add_user(message.from_user.id)
+    await react_user_message(message)
+
+    if not await check_join(client, message.from_user.id):
+        await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🔐</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
+        return
+    welcome_text = (
+        f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.first_name}</code> !!</b>\n\n"
+        "<blockquote><b>𝐖ᴇʟᴄᴏᴍᴇ 𝐓ᴏ 𝐌ᴇᴅɪᴀ 𝐔ᴘʟᴏᴀᴅᴇʀ 𝐁ᴏᴛ</b></blockquote>\n"
+        "<blockquote><i>ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀꜰɪʀᴇ, ᴅᴇᴠᴜᴘʟᴏᴀᴅꜱ ᴏʀ ᴅɪʀᴇᴄᴛ ʟɪɴᴋ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴᴅ ʀᴇɴᴀᴍᴇ ꜰɪʟᴇꜱ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
+        "<blockquote><b>𝐏ʟᴇᴀꜱᴇ 𝐒ʜᴀʀᴇ 𝐀ɴᴅ 𝐆ɪᴠᴇ 𝐒ᴜᴘᴘᴏʀᴛ</b></blockquote>"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
+        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ꜱʜᴀʀᴇ", url="https://t.me/URL_Save_Bot")],
+        [InlineKeyboardButton("ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/zexon_x")],
+        [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
+    ])
+    await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
+
+@app.on_callback_query(filters.regex("check_joined"))
+async def check_joined_cb(client, callback_query):
+    uid = callback_query.from_user.id
+    if await check_join(client, uid):
         try: await callback_query.message.delete()
         except Exception: pass
+        await client.send_message(uid, "<b>ᴠᴇʀɪꜰɪᴇᴅ ɴᴏᴡ ᴄᴏɴᴛɪɴᴜᴇ 🎉</b>", parse_mode=ParseMode.HTML)
+    else:
+        await callback_query.answer("𝚈𝙾𝚄 𝙰𝚁𝙴 𝙽𝙾𝚃 𝙹𝙾𝙸𝙽𝙴𝙳 𝙼𝚈 𝙲𝙷𝙰𝙽𝙽𝙴𝙻, 𝙵𝙸𝚁𝚂𝚃 𝙹𝙾𝙸𝙽 𝙲𝙷𝙰𝙽𝙽𝙴𝙻 𝚃𝙷𝙴𝙽 𝙲𝙻𝙸𝙲𝙺 𝚅𝙴𝚁𝙸𝙵𝙸𝙴𝙳 ❌", show_alert=True)
+
+@app.on_callback_query(filters.regex("bot_close"))
+async def close_cb(client, callback_query):
+    try: await callback_query.message.delete()
+    except Exception: pass
+
+@app.on_message(filters.command("status") & filters.user(ADMIN_ID))
+async def status_cmd(client, message):
+    await react_user_message(message)
+    total_users = len(users_set)
+    await message.reply_text(f"📊 <b>Bot Status Users About</b>\n\nTotal Users: <code>{total_users}</code>", parse_mode=ParseMode.HTML)
+
+@app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
+async def broadcast_cmd(client, message):
+    await react_user_message(message)
+    if not message.reply_to_message:
+        await message.reply_text("Please reply to any message to broadcast it!", parse_mode=ParseMode.HTML)
         return
-    if data == "check_sub":
-        await client.send_chat_action(chat_id, ChatAction.TYPING)
-        if await check_subscription(client, user_id):
-            await callback_query.message.edit_text("<b>ᴄᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴꜱ 🎉\n\nᴛʜᴀɴᴋ ʏᴏᴜ ꜰᴏʀ ᴊᴏɪɴɪɴɢ ᴍʏ ᴄʜᴀɴɴᴇʟ ɴᴏᴡ ʏᴏᴜ ꜱᴛᴀʀᴛ ᴀɢᴀɪɴ ᴀɴᴅ ᴄᴏɴᴛɪɴᴜᴇ</b>")
-        else:
-            await callback_query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴍʏ ᴄʜᴀɴɴᴇʟ ❌", show_alert=True)
-        return
-    if not await check_subscription(client, user_id):
-        await callback_query.answer("ᴘʟᴇᴀꜱᴇ ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴏᴡɴᴇʀ ᴢᴇxᴏɴ ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ ⚠️", show_alert=True)
-        return
-    if user_id not in user_yt_links:
-        await callback_query.answer("Session expired Please send the YouTube link again.", show_alert=True)
-        return
-    url = user_yt_links[user_id]
-    if data == "dl_audio":
-        await callback_query.answer("Please wait Downloading...", show_alert=False)
-        await client.send_chat_action(chat_id, ChatAction.TYPING)
-        status_msg = await callback_query.message.reply_text("<b>𝐍ᴏᴡ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...⏳</b>")
-        if not os.path.exists("downloads"): os.makedirs("downloads")
-        file_path = None
+    sent, failed = 0, 0
+    status_msg = await message.reply_text("🚀 Broadcast started...", parse_mode=ParseMode.HTML)
+    for uid in list(users_set):
         try:
-            loop = asyncio.get_event_loop()
-            def download_audio_with_cookie(use_cookie=False):
-                ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'outtmpl': 'downloads/%(id)s.%(ext)s',
-                    'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
-                }
-                if use_cookie and os.path.exists('cookies.txt'): ydl_opts['cookiefile'] = 'cookies.txt'
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    return ydl.prepare_filename(info).rsplit(".", 1)[0] + ".mp3", info.get('title', 'Audio'), info.get('uploader', 'Unknown')
-            try: file_path, title, uploader = await loop.run_in_executor(None, lambda: download_audio_with_cookie(use_cookie=False))
-            except Exception: file_path, title, uploader = await loop.run_in_executor(None, lambda: download_audio_with_cookie(use_cookie=True))
-            log_history(user, "AUDIO", title, url)
-            await status_msg.edit_text("<b>𝐍ᴏᴡ ᴜᴘʟᴏᴀᴅɪɴɢ...⏳</b>")
-            await client.send_chat_action(chat_id, ChatAction.UPLOAD_AUDIO)
-            await client.send_audio(chat_id=chat_id, audio=file_path, title=title, performer=uploader, caption=f"<b>🎵 {title}</b>\n\n<b><blockquote>𝐏ᴏᴡᴇʀᴇᴅ : @zexon_You_tube_saver_Bot</blockquote></b>")
-            await status_msg.delete()
-        except Exception as e: await status_msg.edit_text(f"❌ **Audio Download Failed:** `{e}`")
-        finally:
-            if file_path and os.path.exists(file_path):
-                try: os.remove(file_path)
-                except Exception: pass
-    elif data == "dl_video":
-        await callback_query.answer("Please wait Downloading...", show_alert=False)
-        await client.send_chat_action(chat_id, ChatAction.TYPING)
-        status_msg = await callback_query.message.reply_text("<b>𝐍ᴏᴡ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ...⏳</b>")
-        if not os.path.exists("downloads"): os.makedirs("downloads")
-        if "shorts" in url: strict_format = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4] / best'
-        else: strict_format = 'bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480][ext=mp4] / best'
-        formats_to_try = [strict_format, 'best']
-        file_path = None; success = False; last_error = None; title = "Video"; duration = 0
-        loop = asyncio.get_event_loop()
-        for current_format in formats_to_try:
-            for use_cookie in [False, True]:
-                try:
-                    def download_video():
-                        ydl_opts = {'format': current_format,'outtmpl': 'downloads/%(id)s.%(ext)s','max_filesize': 500 * 1024 * 1024,'merge_output_format': 'mp4'}
-                        if use_cookie and os.path.exists('cookies.txt'): ydl_opts['cookiefile'] = 'cookies.txt'
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            info = ydl.extract_info(url, download=True)
-                            return ydl.prepare_filename(info), info.get('title', 'Video'), info.get('duration', 0)
-                    file_path, title, duration = await loop.run_in_executor(None, download_video)
-                    success = True; break
-                except Exception as e: last_error = e; continue
-            if success: break
-        if success and file_path:
-            log_history(user, "VIDEO", title, url)
-            try:
-                await status_msg.edit_text("<b>𝐍ᴏᴡ ᴜᴘʟᴏᴀᴅɪɴɢ...⏳</b>")
-                await client.send_chat_action(chat_id, ChatAction.UPLOAD_VIDEO)
-                await client.send_video(chat_id=chat_id, video=file_path, caption=f"<b>{title}</b>\n\n<b><blockquote>𝐏ᴏᴡᴇʀᴇᴅ : @zexon_You_tube_saver_Bot</blockquote></b>", duration=duration, supports_streaming=True)
-                await status_msg.delete()
-            except Exception as e: await status_msg.edit_text(f"❌ **Upload Failed:** `{e}`")
-            finally:
-                if file_path and os.path.exists(file_path):
-                    try: os.remove(file_path)
-                    except Exception: pass
-        else:
-            await status_msg.edit_text(f"❌ **Video Download Failed:** `{last_error}`")
-            if file_path and os.path.exists(file_path):
-                try: os.remove(file_path)
+            await message.reply_to_message.copy(chat_id=uid)
+            sent += 1
+            await asyncio.sleep(0.0)
+        except Exception:
+            failed += 1
+    await status_msg.edit_text(f"✅ <b>Broadcast Completed!</b>\n\n📤 Sent: <code>{sent}</code>\n❌ Failed: <code>{failed}</code>", parse_mode=ParseMode.HTML)
+
+@app.on_message(filters.text & ~filters.command(["start", "status", "broadcast"]))
+async def process(client, message):
+    user_id = message.from_user.id
+    text = message.text.strip()
+    local_file = None
+
+    # --- COOLDOWN CHECK ---
+    if user_id in USER_COOLDOWNS and time.time() < USER_COOLDOWNS[user_id]:
+        remaining = int(USER_COOLDOWNS[user_id] - time.time())
+        mins = remaining // 60
+        secs = remaining % 60
+        await message.reply_text(
+            f"<b>Please wait <code>{mins}:{secs:02d}</code> before sending next request!</b>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    loop = asyncio.get_running_loop()
+
+    # --- STEP 2: USER REPLIED WITH NEW NAME -> SHOW PROCESSING THEN DOWNLOAD & UPLOAD ---
+    if user_id in USER_RENAME_STATES:
+        link_data = USER_RENAME_STATES.pop(user_id)
+        original_url = link_data["url"]
+        is_mf = link_data["is_mf"]
+        is_dev = link_data["is_dev"]
+        dlink = link_data.get("dlink")
+        fsize = link_data.get("fsize", 0)
+        oname = link_data.get("fname", "downloaded_document.bin")
+        prompt_id = link_data.get("prompt_msg_id")
+        user_msg_id = link_data.get("user_msg_id")
+        chat_id = message.chat.id
+
+        if prompt_id:
+            try: await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id], revoke=True)
+            except Exception: pass
+        try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id], revoke=True)
+        except Exception: pass
+
+        status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
+        await asyncio.sleep(4)
+
+        try:
+            if not dlink:
+                if is_mf:
+                    dlink, fsize, oname = await loop.run_in_executor(executor, extract_mediafire_link, original_url)
+                elif is_dev:
+                    dlink, fsize, oname = await loop.run_in_executor(executor, extract_devuploads_link, original_url)
+                else:
+                    dlink = original_url
+
+            if not dlink:
+                await status_msg.edit_text("The Download Failed ❌", parse_mode=ParseMode.HTML)
+                return
+
+            max_limit = MEDIAFIRE_MAX_SIZE if (is_mf or is_dev) else DIRECT_MAX_SIZE
+            if fsize and fsize > max_limit:
+                await status_msg.edit_text(f"<blockquote><b><i>SORRY THIS FILE IS BIG\n\nFILE : {human_readable_size(fsize)}\nLIMIT : {human_readable_size(max_limit)}</i></b></blockquote>", parse_mode=ParseMode.HTML)
+                return
+
+            local_file = f"{user_id}_{int(time.time())}_{oname}"
+
+            new_name = text
+            if "." not in new_name:
+                ext = os.path.splitext(oname)[1]
+                new_name = new_name + ext
+
+            def dl_file():
+                downloaded = 0
+                start = time.time()
+                last = [0]
+                headers = {"User-Agent": "Mozilla/5.0"}
+                with requests.get(dlink, headers=headers, stream=True, timeout=1200) as r:
+                    r.raise_for_status()
+                    total = int(r.headers.get("content-length", 0)) or fsize or 0
+                    with open(local_file, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=1 * 1024 * 1024):
+                            if not chunk: continue
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            gc.collect()
+                            now = time.time()
+                            is_complete = (downloaded >= total and total > 0)
+                            if total > 0 and (now - last[0] > 10.0 or is_complete):
+                                last[0] = now
+                                percent = 100.0 if is_complete else ((downloaded / total) * 100 if total > 0 else 0)
+                                speed = downloaded / (now - start + 0.001)
+                                eta = 0 if is_complete else (total - downloaded) / speed if speed > 0 else 0
+                                bar = get_progress_bar(percent)
+                                eta_str = format_eta(eta)
+                                txt = (
+                                     f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
+                                     f"<code>{bar}</code>\n\n"
+                                     f"<blockquote><b>💾 Size :</b>  {human_readable_size(total)}\n\n"
+                                     f"<b>📦 Done :</b>  {human_readable_size(downloaded)}\n\n"
+                                     f"<b>⚙️ Speed :</b>  {human_readable_size(speed)}\n\n"
+                                     f"<b>⏰ Left Eta :</b>  {eta_str}</blockquote>\n\n"
+                                     f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Bot</blockquote>"
+                                )
+                                try:
+                                    fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
+                                    fut.result(timeout=4)
+                                except Exception: pass
+
+            await loop.run_in_executor(executor, dl_file)
+
+            dir_name = os.path.dirname(local_file) if os.path.dirname(local_file) else "."
+            new_file_path = os.path.join(dir_name, new_name)
+            os.rename(local_file, new_file_path)
+
+            await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>", parse_mode=ParseMode.HTML)
+            await asyncio.sleep(1.4)
+
+            upload_start = [time.time()]
+            last_up_time = [0]
+            
+            async def upload_progress(current, total):
+                now = time.time()
+                is_complete = (current >= total and total > 0)
+                percent = 100.0 if is_complete else ((current / total) * 100 if total > 0 else 0)
+                if not is_complete and (now - last_up_time[0] < 14.0): return
+                last_up_time[0] = now
+                elapsed = now - upload_start[0]
+                speed = current / (elapsed + 0.001) if elapsed > 0 else 0
+                eta = 0 if is_complete else ((total - current) / speed if speed > 0 else 0)
+                bar = get_progress_bar(percent)
+                eta_str = format_eta(eta)
+                txt = (
+                    f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
+                    f"<code>{bar}</code>\n\n"
+                    f"<blockquote><b>💾 Size :</b>  {human_readable_size(total)}\n\n"
+                    f"<b>📦 Done :</b>  {human_readable_size(current)}\n\n"
+                    f"<b>⚙️ Speed :</b>  {human_readable_size(speed)}\n\n"
+                    f"<b>⏰ Left Eta :</b>  {eta_str}</blockquote>\n\n"
+                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Bot</blockquote>"
+                )
+                try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
 
+            await client.send_document(
+                chat_id=message.chat.id, 
+                document=new_file_path, 
+                file_name=new_name, 
+                progress=upload_progress, 
+                force_document=True,
+                reply_to_message_id=user_msg_id
+            )
+
+            try: await status_msg.delete()
+            except Exception: pass
+
+            cooldown_seconds = 60
+            USER_COOLDOWNS[user_id] = time.time() + cooldown_seconds
+            
+            timer_msg = await client.send_message(
+                chat_id, 
+                f"<b>Please Wait 1:00</b>\n<b>Resetting Your Session</b>", 
+                parse_mode=ParseMode.HTML,
+                reply_to_message_id=user_msg_id
+            )
+            
+            for remaining in range(cooldown_seconds, 0, -1):
+                mins = remaining // 60
+                secs = remaining % 60
+                time_str = f"{secs:02d}"
+                try:
+                    await timer_msg.edit_text(
+                        f"<b>Cooldown Please Wait {time_str} Second</b><b> For Health Then Send Next Link</b>",
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception: pass
+                await asyncio.sleep(1)
+
+            try: await timer_msg.delete()
+            except Exception: pass
+
+            await client.send_message(chat_id, "<b>Now You can send me new Link 😊</b>", parse_mode=ParseMode.HTML)
+
+        except Exception as e:
+            try: await status_msg.edit_text(f"❌ Error: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
+            except Exception: pass
+        finally:
+            safe_remove(local_file)
+            if 'new_file_path' in locals():
+                safe_remove(new_file_path)
+            gc.collect()
+        return
+    # ------------------------------------------------------------------------
+
+    add_user(user_id)
+    await react_user_message(message)
+    if not await check_join(client, user_id):
+        await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🤨</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
+        return
+
+    is_mf = "mediafire.com" in text
+    is_dev = "devuploads.com" in text
+
+    # --- STEP 1: MEDIAFIRE / DEVUPLOADS LINK HANDLER ---
+    if is_mf or is_dev:
+        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
+        await asyncio.sleep(10.0)
+        if is_mf:
+            dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
+        else:
+            dlink, fsize, fname = await loop.run_in_executor(executor, extract_devuploads_link, text)
+
+        if not dlink:
+            await proc_msg.edit_text("<b>This Link Expired ❌</b>", parse_mode=ParseMode.HTML)
+            return
+
+        USER_RENAME_STATES[user_id] = {
+            "url": text,
+            "dlink": dlink,
+            "fsize": fsize,
+            "fname": fname,
+            "is_mf": is_mf,
+            "is_dev": is_dev,
+            "prompt_msg_id": proc_msg.id,
+            "user_msg_id": message.id
+        }
+
+        txt = (
+            f"<b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
+            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code>\n\n"
+            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b>"
+        )
+        await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
+        return
+
+    # --- STEP 1: DIRECT LINK / MAGNET HANDLER ---
+    if text.startswith("http://") or text.startswith("https://"):
+        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
+        
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        try:
+            head_r = requests.head(text, headers=headers, allow_redirects=True, timeout=20)
+            fsize = int(head_r.headers.get("content-length", 0))
+        except Exception:
+            fsize = 0
+
+        fname = text.split("/")[-1].split("?")[0]
+        if not fname or "." not in fname:
+            fname = "downloaded_document.bin"
+
+        USER_RENAME_STATES[user_id] = {
+            "url": text,
+            "dlink": text,
+            "fsize": fsize,
+            "fname": fname,
+            "is_mf": False,
+            "is_dev": False,
+            "prompt_msg_id": proc_msg.id,
+            "user_msg_id": message.id
+        }
+
+        txt = (
+            f"<b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
+            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code>\n\n"
+            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b>"
+        )
+        await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
+        return
+    else:
+        await message.reply_text("<b>Please send a valid MediaFire, Devuploads, or Direct File Link! ❌</b>", parse_mode=ParseMode.HTML)
+
+
 if __name__ == "__main__":
-    print("YouTube Downloader Bot Running...")
+    print("URL Uploader Bot Starting Successfully")
     app.run()
