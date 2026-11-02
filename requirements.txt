@@ -1,3 +1,4 @@
 pyrogram
-yt-dlp
 tgcrypto
+beautifulsoup4
+requests
