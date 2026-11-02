@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "909194"
+BOT_TOKEN = "9091943258:AAH4QKu5MJ3Tg4ZTThBAUi7GR-xO6fl1BiQ"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -281,7 +281,7 @@ async def process(client, message):
                                      f"📦 Done : {human_readable_size(downloaded)}\n"
                                      f"⚙️ Speed : {human_readable_size(speed)}\n"
                                      f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                                     f"<blockquote><b> 𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Bot </blockquote>"
+                                     f"<blockquote><b> 𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot </blockquote>"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -315,7 +315,7 @@ async def process(client, message):
                     f"📦 Done : {human_readable_size(current)}\n"
                     f"⚙️ Speed : {human_readable_size(speed)}\n"
                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ : @URL_Uploadex_Bot </blockquote>"
+                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ : @URL_Uploadex_Robot </blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
@@ -332,8 +332,7 @@ async def process(client, message):
             try: await status_msg.delete()
             except Exception: pass
 
-            USER_COOLDOWNS[user_id] = time.time() + 30
-            await client.send_message(chat_id, "<b>ᴛʜᴀɴᴋꜱ ꜰᴏʀ ᴜꜱɪɴɢ ᴍᴇ 😊</b>", parse_mode=ParseMode.HTML)
+            USER_COOLDOWNS[user_id] = time.time() + 60
 
         except Exception as e:
             try: await status_msg.edit_text(f"❌ Error: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
@@ -356,7 +355,7 @@ async def process(client, message):
 
     if is_mf or is_dev:
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(2)
+        await asyncio.sleep(4)
         if is_mf:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
         else:
@@ -372,9 +371,9 @@ async def process(client, message):
         }
 
         txt = (
-            f"<b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code>\n\n"
-            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b>"
+            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
+            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n\n"
+            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b><blockquote>"
         )
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         return
@@ -397,9 +396,9 @@ async def process(client, message):
         }
 
         txt = (
-            f"<b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code>\n\n"
-            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ </b>"
+            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
+            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n\n"
+            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ </b></blockquote>"
         )
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         return
