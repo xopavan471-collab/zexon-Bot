@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAG9VTOHgJrtbQ0mo80_rl0fEbPnXzfQ0hc"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -372,11 +372,10 @@ async def process(client, message):
 
         txt = (
             f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n\n"
+            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n"
             f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b><blockquote>\n"
         )
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
-        return
 
     if text.startswith("http://") or text.startswith("https://"):
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
@@ -385,22 +384,6 @@ async def process(client, message):
             fsize = int(head_r.headers.get("content-length", 0))
         except Exception:
             fsize = 0
-
-        fname = text.split("/")[-1].split("?")[0]
-        if not fname or "." not in fname:
-            fname = "downloaded_document.bin"
-
-        USER_RENAME_STATES[user_id] = {
-            "url": text, "dlink": text, "fsize": fsize, "fname": fname,
-            "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id
-        }
-
-        txt = (
-            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n\n"
-            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b></blockquote>\n"
-        )
-        await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
 
 if __name__ == "__main__":
     print("URL Uploader Bot Starting Successfully")
