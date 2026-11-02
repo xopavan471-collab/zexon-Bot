@@ -23,8 +23,8 @@ ADMIN_ID = 8562470788
 REQUIRED_CHANNEL = -1004334558910
 CHANNEL_URL = "https://t.me/zexon_Bot_updates"
 
-MEDIAFIRE_MAX_SIZE = 460 * 1024 * 1024
-DIRECT_MAX_SIZE = 460 * 1024 * 1024
+MEDIAFIRE_MAX_SIZE = 800* 1024 * 1024
+DIRECT_MAX_SIZE = 800 * 1024 * 1024
 
 REACTION_EMOJIS = ["🎉", "🥺", "😅", "⚡", "😊", "🙏", "🔥", "😍", "😘", "😐", "😌", "😃", "😂", "😭", "🙃", "🤭", "🤨", "😈", "👻", "👍"]
 
@@ -174,9 +174,9 @@ async def start_cmd(client, message):
 
     welcome_text = (
         f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.first_name}</code> !!</b>\n\n"
-        "<blockquote><b>𝐖ᴇʟᴄᴏᴍᴇ 𝐓ᴏ 𝐔𝐑𝐋 𝐔ᴘʟᴏᴀᴅᴇʀ 𝐁ᴏᴛ</b></blockquote>\n"
-        "<blockquote><i>ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀꜰɪʀᴇ, ᴅᴇᴠᴜᴘʟᴏᴀᴅꜱ ᴏʀ ᴅɪʀᴇᴄᴛ ʟɪɴᴋ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴᴅ ʀᴇɴᴀᴍᴇ ꜰɪʟᴇꜱ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
-        "<blockquote><b>𝐏ʟᴇᴀꜱᴇ 𝐒ʜᴀʀᴇ 𝐀ɴᴅ 𝐆ɪᴠᴇ 𝐒ᴜᴘᴘᴏʀᴛ</b></blockquote>"
+        "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⎈</b></blockquote>\n"
+        "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ʏᴏᴜʀ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ ᴍᴀɢɴᴇᴛ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ꜰʀᴏᴍ ᴅᴏᴄᴜᴍᴇɴᴛ ꜰɪʟᴇ ᴀɴᴅ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜱᴀᴍᴇ ʟɪɴᴋ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ᴅᴜᴘʟᴏᴀᴅ ɴᴇᴛ ᴀɴᴅ ᴍᴏʀᴇ, ᴛʜᴇ ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋ ᴀɴᴏᴛʜᴇʀ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴛʜɪꜱ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀɴᴅ ꜱᴇɴᴅ ʏᴏᴜ ꜰɪʟᴇ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
+        "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
@@ -268,7 +268,7 @@ async def process(client, message):
                             downloaded += len(chunk)
                             now = time.time()
                             is_complete = (downloaded >= total and total > 0)
-                            if total > 0 and (now - last[0] > 8.0 or is_complete):
+                            if total > 0 and (now - last[0] > 10.0 or is_complete):
                                 last[0] = now
                                 percent = 100.0 if is_complete else ((downloaded / total) * 100)
                                 speed = downloaded / (now - start + 0.001)
@@ -277,10 +277,11 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote><b>💾 Size :</b> {human_readable_size(total)}\n"
-                                     f"<b>📦 Done :</b> {human_readable_size(downloaded)}\n"
-                                     f"<b>⚙️ Speed :</b> {human_readable_size(speed)}\n"
-                                     f"<b>⏰ Left Eta :</b> {format_eta(eta)}</blockquote>"
+                                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
+                                     f"📦 Done : {human_readable_size(downloaded)}\n"
+                                     f"⚙️ Speed : {human_readable_size(speed)}\n"
+                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
+                                     f"<blockquote><b> 𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Bot </blockquote>"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -310,10 +311,11 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote><b>💾 Size :</b> {human_readable_size(total)}\n"
-                    f"<b>📦 Done :</b> {human_readable_size(current)}\n"
-                    f"<b>⚙️ Speed :</b> {human_readable_size(speed)}\n"
-                    f"<b>⏰ Left Eta :</b> {format_eta(eta)}</blockquote>"
+                    f"<blockquote>💾 Size : {human_readable_size(total)}\n"
+                    f"📦 Done : {human_readable_size(current)}\n"
+                    f"⚙️ Speed : {human_readable_size(speed)}\n"
+                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
+                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ : @URL_Uploadex_Bot </blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
@@ -331,7 +333,7 @@ async def process(client, message):
             except Exception: pass
 
             USER_COOLDOWNS[user_id] = time.time() + 30
-            await client.send_message(chat_id, "<b>Now You can send me new Link 😊</b>", parse_mode=ParseMode.HTML)
+            await client.send_message(chat_id, "<b>ᴛʜᴀɴᴋꜱ ꜰᴏʀ ᴜꜱɪɴɢ ᴍᴇ 😊</b>", parse_mode=ParseMode.HTML)
 
         except Exception as e:
             try: await status_msg.edit_text(f"❌ Error: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
@@ -397,7 +399,7 @@ async def process(client, message):
         txt = (
             f"<b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
             f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code>\n\n"
-            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b>"
+            f"<b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ </b>"
         )
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         return
