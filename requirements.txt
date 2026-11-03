@@ -1,2 +1,4 @@
 pyrofork
 tgcrypto
+beautifulsoup4
+requests
