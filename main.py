@@ -5,7 +5,7 @@ from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineK
 # Apni Telegram API credentials yahan daalein
 API_ID = 33208732       # My.telegram.org se milega
 API_HASH = "28626a3063a8161fc374ce904093c4e0"   # My.telegram.org se milega
-BOT_TOKEN = "8923952201:AAHg2atUeNRYI-_TaO9JNmbHaiBSAOT9xyg" # BotFather se milega
+BOT_TOKEN = "BOT TOKEN" # BotFather se milega
 
 app = Client(
     "fancy_font_pyrogram_bot",
