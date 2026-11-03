@@ -1,3 +1,16 @@
+from flask import Flask
+import threading
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Zexon Bot is Running!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=5000)
+    
+#yeha se bot starting ka khel shuru hoga
 import os
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
