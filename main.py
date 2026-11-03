@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -194,7 +194,7 @@ async def start_cmd(client, message):
         await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🔐</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
         return
     welcome_text = (
-        f"<b><i>𝐇ᴇʟʟᴏ <code>{message.from_user.full_name}</code> </i></b>\n\n"
+        f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.full_name}</code> </b>\n\n"
         "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⎈</b></blockquote>\n"
         "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ʏᴏᴜʀ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ ᴍᴀɢɴᴇᴛ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ꜰʀᴏᴍ ᴅᴏᴄᴜᴍᴇɴᴛ ꜰɪʟᴇ ᴀɴᴅ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜱᴀᴍᴇ ʟɪɴᴋ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ᴀɴᴅ ᴍᴏʀᴇ, ᴛʜᴇ ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀɴᴅ ꜱᴇɴᴅ ʏᴏᴜ ꜰɪʟᴇꜱ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
