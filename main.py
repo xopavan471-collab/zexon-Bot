@@ -4,7 +4,6 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import yt_dlp
 
-# Bot credentials configuration
 API_ID = "33208732"
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
 BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
@@ -13,10 +12,12 @@ app = Client("ZexonAllInOneBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT
 
 user_data = {}
 
-# Common headers to bypass bot detection on platforms
 YT_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
+
+# Check if cookies file exists in the repo
+COOKIE_FILE = 'cookies.txt' if os.path.exists('cookies.txt') else None
 
 def get_quality_keyboard():
     return InlineKeyboardMarkup(
@@ -43,7 +44,7 @@ async def start_handler(client: Client, message: Message):
     welcome_text = (
         f"**👋 Welcome to Zexon All-in-One Downloader Bot!**\n\n"
         f"Yahan aap Instagram, YouTube aur Facebook ke links bhej kar asani se media download kar sakte hain.\n\n"
-        f"Bas koi bhi link yahan bhejhiye!"
+        f"Bas koi bhi link yahan bhejhiye! 🚀"
     )
     await message.reply_text(welcome_text)
 
@@ -52,7 +53,6 @@ async def link_handler(client: Client, message: Message):
     url = message.text.strip()
     status_msg = await message.reply_text("Checking... 🔍")
     
-    # Instagram link flow: Checking -> Downloading -> Send video directly
     if "instagram.com" in url:
         await status_msg.edit_text("Downloading... ⏳")
         
@@ -85,18 +85,16 @@ async def link_handler(client: Client, message: Message):
             await status_msg.edit_text(f"❌ Failed: {str(e)}")
             
     else:
-        # YouTube / Facebook link flow: Thumbnail, Title, Quality buttons
         try:
             ydl_opts = {
                 'quiet': True, 
                 'no_warnings': True,
                 'http_headers': YT_HEADERS,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android', 'web']
-                    }
-                }
+                'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
             }
+            if COOKIE_FILE:
+                ydl_opts['cookiefile'] = COOKIE_FILE
+                
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get('title', 'Social Media Video')
@@ -133,43 +131,32 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
     url = user_data[user_id]['url']
     format_type = data.split("_")[1]
     
-    # Delete preview post and start Downloading... status message
     await callback_query.message.delete()
     status_msg = await client.send_message(callback_query.message.chat.id, "Downloading... ⏳ Please wait.")
     
     output_template = f"downloads/{user_id}_%(id)s.%(ext)s"
     os.makedirs("downloads", exist_ok=True)
     
+    ydl_opts = {
+        'http_headers': YT_HEADERS,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'outtmpl': output_template,
+    }
+    if COOKIE_FILE:
+        ydl_opts['cookiefile'] = COOKIE_FILE
+
     if format_type == "mp3":
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': output_template,
-            'http_headers': YT_HEADERS,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            },
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        }
+        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
     else:
         res_map = {"360": "360", "480": "480", "720": "720", "1080": "1080"}
         height = res_map.get(format_type, "720")
-        ydl_opts = {
-            'format': f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
-            'outtmpl': output_template,
-            'http_headers': YT_HEADERS,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            },
-            'merge_output_format': 'mp4',
-        }
+        ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best'
+        ydl_opts['merge_output_format'] = 'mp4'
         
     try:
         def download_file():
