@@ -1,433 +1,109 @@
-import asyncio
-import gc
-import json
-import math
 import os
-import random
-import re
-import time
-from concurrent.futures import ThreadPoolExecutor
-from bs4 import BeautifulSoup
-from pyrogram import Client, filters
-from pyrogram.enums import ParseMode
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.raw import types
-import requests
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+import yt_dlp
 
-# --- CONFIG ---
-API_ID = 33208732
-API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
-ADMIN_ID = 8562470788
+BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-REQUIRED_CHANNEL = -1004334558910
-CHANNEL_URL = "https://t.me/zexon_Bot_updates"
-
-MEDIAFIRE_MAX_SIZE = 800* 1024 * 1024
-DIRECT_MAX_SIZE = 800 * 1024 * 1024
-
-REACTION_EMOJIS = ["🎉", "🥺", "😅", "⚡", "😊", "🙏", "🔥", "😍", "😘", "😐", "😌", "😃", "😂", "😭", "🙃", "🤭", "🤨", "😈", "👻", "👍"]
-
-USERS_FILE = "users.json"
-executor = ThreadPoolExecutor(max_workers=2)
-
-USER_RENAME_STATES = {}
-USER_COOLDOWNS = {}
-
-def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r") as f:
-                return set(json.load(f))
-        except Exception:
-            return set()
-    return set()
-
-def save_users(s):
-    try:
-        with open(USERS_FILE, "w") as f:
-            json.dump(list(s), f)
-    except Exception:
-        pass
-
-users_set = load_users()
-def add_user(uid):
-    if uid not in users_set:
-        users_set.add(uid)
-        save_users(users_set)
-
-def get_random_emoji():
-    return random.choice(REACTION_EMOJIS)
-
-def human_readable_size(b):
-    if not b: return "0 MB"
-    n = ("B", "KB", "MB", "GB")
-    i = int(math.floor(math.log(b, 1024))) if b > 0 else 0
-    p = math.pow(1024, i)
-    return f"{round(b/p, 2)} MB" if i <= 2 else f"{round(b/p, 2)} GB"
-
-def get_progress_bar(p):
-    t = 16
-    if p >= 99.5:
-        return "▣" * t
-    c = int((p / 100) * t)
-    c = min(max(c, 0), t - 1)
-    return "▣" * c + "▢" * (t - c)
-
-def format_eta(seconds):
-    if seconds <= 0:
-        return "0 S"
-    mins = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{secs} S"
-
-def safe_remove(p):
-    try:
-        if p and os.path.exists(p):
-            os.remove(p)
-    except Exception:
-        pass
-    finally:
-        gc.collect()
-
-async def check_join(client, user_id):
-    try:
-        member = await client.get_chat_member(REQUIRED_CHANNEL, user_id)
-        if str(member.status) in ["ChatMemberStatus.MEMBER", "ChatMemberStatus.ADMINISTRATOR", "ChatMemberStatus.OWNER", "member", "administrator", "creator"]:
-            return True
-        return False
-    except Exception:
-        return False
-
-def get_join_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Join channel 💠", url=CHANNEL_URL)],
-        [InlineKeyboardButton("Click to verify ✅", callback_data="check_joined")]
-    ])
-
-def extract_mediafire_link(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    for _ in range(3):
-        try:
-            r = requests.get(url, headers=headers, timeout=30)
-            if r.status_code == 200:
-                soup = BeautifulSoup(r.text, "html.parser")
-                btn = soup.find("a", id="downloadButton") or soup.find("a", class_=re.compile("input|download", re.I))
-                if btn and btn.get("href"):
-                    dlink = btn["href"]
-                    if dlink.startswith("//"): dlink = "https:" + dlink
-                    fname_div = soup.find("div", class_="filename")
-                    fname = fname_div.text.strip() if fname_div else dlink.split("/")[-1].split("?")[0]
-                    try:
-                        h = requests.head(dlink, headers=headers, allow_redirects=True, timeout=20)
-                        fsize = int(h.headers.get("content-length", 0))
-                    except Exception: fsize = 0
-                    return dlink, fsize, fname
-        except Exception:
-            time.sleep(2)
-    return None, None, None
-
-def extract_devuploads_link(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    for _ in range(3):
-        try:
-            r = requests.get(url, headers=headers, timeout=30)
-            if r.status_code == 200:
-                soup = BeautifulSoup(r.text, "html.parser")
-                data = {}
-                for input_tag in soup.find_all("input"):
-                    if input_tag.get("name"):
-                        data[input_tag.get("name")] = input_tag.get("value", "")
-                post_r = requests.post(url, data=data, headers=headers, timeout=30)
-                if post_r.status_code == 200:
-                    post_soup = BeautifulSoup(post_r.text, "html.parser")
-                    download_btn = post_soup.find("a", class_="download-btn") or post_soup.find("a", id="downloadbtn")
-                    if download_btn and download_btn.get("href"):
-                        dlink = download_btn["href"]
-                        fname = dlink.split("/")[-1].split("?")[0]
-                        try:
-                            h = requests.head(dlink, headers=headers, allow_redirects=True, timeout=20)
-                            fsize = int(h.headers.get("content-length", 0))
-                        except Exception: fsize = 0
-                        return dlink, fsize, fname
-        except Exception:
-            time.sleep(2)
-    return None, None, None
-
-# --- NAYA DIRECT LINK HANDLER - MAGNET JAISE DIRECT DOWNLOAD ---
-def extract_direct_link(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    try:
-        h = requests.head(url, headers=headers, allow_redirects=True, timeout=20)
-        fsize = int(h.headers.get("content-length", 0))
-        fname = None
-        cd = h.headers.get("Content-Disposition", "")
-        if "filename=" in cd:
-            m = re.search(r'filename="(.+?)"', cd) or re.search(r"filename=(.+)", cd)
-            if m:
-                fname = m.group(1).strip('"').strip()
-        if not fname:
-            fname = url.split("/")[-1].split("?")[0].split("#")[0]
-            if not fname or "." not in fname:
-                ctype = h.headers.get("Content-Type","")
-                ext = ctype.split("/")[-1] if "/" in ctype else "bin"
-                fname = f"file_{int(time.time())}.{ext[:4]}"
-        return url, fsize, fname
-    except Exception:
-        fname = url.split("/")[-1].split("?")[0] or f"file_{int(time.time())}.bin"
-        return url, 0, fname
-
-app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
-async def react_user_message(message):
-    try:
-        emoji = get_random_emoji()
-        await app.send_reaction(chat_id=message.chat.id, message_id=message.id, emoji=types.ReactionEmoji(emoticon=emoji))
-    except Exception:
-        pass
-
-@app.on_message(filters.command("start"))
-async def start_cmd(client, message):
-    add_user(message.from_user.id)
-    await react_user_message(message)
-    if not await check_join(client, message.from_user.id):
-        await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🔐</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
-        return
-    welcome_text = (
-        f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.full_name}</code> </b>\n\n"
-        "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⎈</b></blockquote>\n"
-        "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ʏᴏᴜʀ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ ᴍᴀɢɴᴇᴛ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ꜰʀᴏᴍ ᴅᴏᴄᴜᴍᴇɴᴛ ꜰɪʟᴇ ᴀɴᴅ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜱᴀᴍᴇ ʟɪɴᴋ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ᴀɴᴅ ᴍᴏʀᴇ, ᴛʜᴇ ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀɴᴅ ꜱᴇɴᴅ ʏᴏᴜ ꜰɪʟᴇꜱ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
-        "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
-    )
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
-        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ", url="https://t.me/zexon_x")],
-        [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
-    ])
-    await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
-
-@app.on_callback_query(filters.regex("check_joined"))
-async def check_joined_cb(client, callback_query):
-    uid = callback_query.from_user.id
-    if await check_join(client, uid):
-        try: await callback_query.message.delete()
-        except Exception: pass
-        await client.send_message(uid, "<b>ᴠᴇʀɪꜰɪᴇᴅ ɴᴏᴡ ᴄᴏɴᴛɪɴᴜᴇ 🎉</b>", parse_mode=ParseMode.HTML)
-    else:
-        await callback_query.answer("𝚈𝙾𝚄 𝙰𝚁𝙴 𝙽𝙾𝚃 𝙹𝙾𝙸𝙽𝙴𝙳 𝙼𝚈 𝙲𝙷𝙰𝙽𝙽𝙴𝙻, 𝙵𝙸𝚁𝚂𝚃 𝙹𝙾𝙸𝙽 𝙲𝙷𝙰𝙽𝙽𝙴𝙻 𝚃𝙷𝙴𝙽 𝙲𝙻𝙸𝙲𝙺 𝚅𝙴𝚁𝙸𝙵𝙸𝙴𝙳 ❌", show_alert=True)
-
-@app.on_callback_query(filters.regex("bot_close"))
-async def close_cb(client, callback_query):
-    try: await callback_query.message.delete()
-    except Exception: pass
-
-@app.on_message(filters.text & ~filters.command(["start"]))
-async def process(client, message):
-    user_id = message.from_user.id
-    text = message.text.strip()
-    local_file = None
-
-    if user_id in USER_COOLDOWNS and time.time() < USER_COOLDOWNS[user_id]:
-        remaining = int(USER_COOLDOWNS[user_id] - time.time())
-        await message.reply_text(f"<b>Please wait <code>{remaining}s</code> before sending next request!</b>", parse_mode=ParseMode.HTML)
+# Step 1: Link aate hi Info nikal ke same look dikhao
+async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = update.message.text
+    if "http" not in url:
         return
 
-    loop = asyncio.get_running_loop()
+    context.user_data['last_url'] = url
+    await update.message.reply_text("⏳ Fetching...")
 
-    # --- RENAME STATE ---
-    if user_id in USER_RENAME_STATES:
-        link_data = USER_RENAME_STATES.pop(user_id)
-        original_url = link_data["url"]
-        is_mf = link_data["is_mf"]
-        is_dev = link_data["is_dev"]
-        dlink = link_data.get("dlink")
-        fsize = link_data.get("fsize", 0)
-        oname = link_data.get("fname", "downloaded_document.bin")
-        prompt_id = link_data.get("prompt_msg_id")
-        user_msg_id = link_data.get("user_msg_id")
-        chat_id = message.chat.id
+    # Sirf info nikalna hai, download nahi
+    ydl_opts = {'quiet': True, 'skip_download': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        title = info.get('title', 'Video')
+        thumbnail = info.get('thumbnail')
+        duration = info.get('duration_string', '')
+        
+        # Available qualities check
+        formats = info.get('formats', [])
+        heights = set([f.get('height') for f in formats if f.get('height')])
+        
+        # Button layout - Bilkul tere screenshot jaisa
+        keyboard = []
+        row1 = []
+        row2 = []
+        if 360 in heights or True: # hamesha dikhana hai
+            row1.append(InlineKeyboardButton("🎬 360p (⏳)", callback_data="360"))
+        if 480 in heights or True:
+            row1.append(InlineKeyboardButton("🎬 480p (⏳)", callback_data="480"))
+        
+        if 720 in heights or True:
+            row2.append(InlineKeyboardButton("🎬 720p (⏳)", callback_data="720"))
+        if 1080 in heights or True:
+            row2.append(InlineKeyboardButton("🎬 1080p (⏳)", callback_data="1080"))
 
-        if prompt_id:
-            try: await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id])
-            except Exception: pass
-        try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id])
-        except Exception: pass
+        keyboard.append(row1)
+        keyboard.append(row2)
+        keyboard.append([InlineKeyboardButton("🎵 Audio", callback_data="audio")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-        status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
-        await asyncio.sleep(2)
-
-        try:
-            if not dlink:
-                if is_mf:
-                    dlink, fsize, oname = await loop.run_in_executor(executor, extract_mediafire_link, original_url)
-                elif is_dev:
-                    dlink, fsize, oname = await loop.run_in_executor(executor, extract_devuploads_link, original_url)
-                else:
-                    dlink = original_url
-
-            if not dlink:
-                await status_msg.edit_text("The Download Failed ❌", parse_mode=ParseMode.HTML)
-                return
-
-            local_file = f"{user_id}_{int(time.time())}_{oname}"
-            new_name = text
-            if "." not in new_name:
-                ext = os.path.splitext(oname)[1]
-                new_name = new_name + ext
-
-            def dl_file():
-                downloaded = 0
-                start = time.time()
-                last = [0]
-                headers = {"User-Agent": "Mozilla/5.0"}
-                with requests.get(dlink, headers=headers, stream=True, timeout=1200) as r:
-                    r.raise_for_status()
-                    total = int(r.headers.get("content-length", 0)) or fsize or 0
-                    with open(local_file, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=1 * 1024 * 1024):
-                            if not chunk: continue
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            now = time.time()
-                            is_complete = (downloaded >= total and total > 0)
-                            if total > 0 and (now - last[0] > 10.0 or is_complete):
-                                last[0] = now
-                                percent = 100.0 if is_complete else ((downloaded / total) * 100)
-                                speed = downloaded / (now - start + 0.001)
-                                eta = 0 if is_complete else (total - downloaded) / speed if speed > 0 else 0
-                                bar = get_progress_bar(percent)
-                                txt = (
-                                     f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
-                                     f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
-                                     f"📦 Done : {human_readable_size(downloaded)}\n"
-                                     f"⚙️ Speed : {human_readable_size(speed)}\n"
-                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                                     f"<blockquote><b> 𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot </blockquote>"
-                                )
-                                try:
-                                    fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
-                                    fut.result(timeout=3)
-                                except Exception: pass
-
-            await loop.run_in_executor(executor, dl_file)
-
-            new_file_path = os.path.join(os.path.dirname(local_file) or ".", new_name)
-            os.rename(local_file, new_file_path)
-
-            await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>", parse_mode=ParseMode.HTML)
-            await asyncio.sleep(1)
-
-            upload_start = [time.time()]
-            last_up = [0]
-
-            async def upload_progress(current, total):
-                now = time.time()
-                is_complete = (current >= total and total > 0)
-                percent = 100.0 if is_complete else ((current / total) * 100 if total > 0 else 0)
-                if not is_complete and (now - last_up[0] < 10.0): return
-                last_up[0] = now
-                speed = current / (now - upload_start[0] + 0.001)
-                eta = 0 if is_complete else ((total - current) / speed if speed > 0 else 0)
-                bar = get_progress_bar(percent)
-                txt = (
-                    f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
-                    f"<code>{bar}</code>\n\n"
-                    f"<blockquote>💾 Size : {human_readable_size(total)}\n"
-                    f"📦 Done : {human_readable_size(current)}\n"
-                    f"⚙️ Speed : {human_readable_size(speed)}\n"
-                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ : @URL_Uploadex_Robot </blockquote>"
-                )
-                try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
-                except Exception: pass
-
-            await client.send_document(
-                chat_id=message.chat.id,
-                document=new_file_path,
-                file_name=new_name,
-                progress=upload_progress,
-                force_document=True,
-                reply_to_message_id=user_msg_id
-            )
-
-            try: await status_msg.delete()
-            except Exception: pass
-
-            USER_COOLDOWNS[user_id] = time.time() + 60
-
-        except Exception as e:
-            try: await status_msg.edit_text(f"❌ Error: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
-            except Exception: pass
-        finally:
-            safe_remove(local_file)
-            if 'new_file_path' in locals():
-                safe_remove(new_file_path)
-            gc.collect()
-        return
-
-    add_user(user_id)
-    await react_user_message(message)
-    if not await check_join(client, user_id):
-        await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🤨</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
-        return
-
-    is_mf = "mediafire.com" in text
-    is_dev = "devuploads.com" in text
-
-    # MEDIAFIRE / DEVUPLOADS
-    if is_mf or is_dev:
-        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(4)
-        if is_mf:
-            dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
+        # Same look - Photo + Title + Buttons
+        caption = f"🍿 {title}\n\n🔥 FF Panel Bot | Select Quality 👇"
+        # Agar thumbnail hai toh photo ke sath bhejo
+        if thumbnail:
+            await update.message.reply_photo(photo=thumbnail, caption=caption, reply_markup=reply_markup)
         else:
-            dlink, fsize, fname = await loop.run_in_executor(executor, extract_devuploads_link, text)
+            await update.message.reply_text(caption, reply_markup=reply_markup)
 
-        if not dlink:
-            await proc_msg.edit_text("<b>This Link Expired ❌</b>", parse_mode=ParseMode.HTML)
-            return
+# Step 2: Quality select pe download
+async def download_on_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    url = context.user_data.get('last_url')
+    quality = query.data
+    
+    await query.edit_message_caption(caption=f"⏳ Downloading {quality}... Ruk ja bhai")
 
-        USER_RENAME_STATES[user_id] = {
-            "url": text, "dlink": dlink, "fsize": fsize, "fname": fname,
-            "is_mf": is_mf, "is_dev": is_dev, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id
-        }
+    format_map = {
+        "360": "best[height<=360][ext=mp4]/best",
+        "480": "best[height<=480][ext=mp4]/best",
+        "720": "best[height<=720][ext=mp4]/best",
+        "1080": "best[height<=1080][ext=mp4]/best",
+        "audio": "bestaudio/best"
+    }
 
-        txt = (
-            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n"
-            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ꜰɪʟᴇ ɴᴀᴍᴇ ✎</b></blockquote>\n"
-        )
-        await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
-        return
+    ydl_opts = {
+        'format': format_map.get(quality, 'best'),
+        'outtmpl': f'{DOWNLOAD_FOLDER}/%(title)s.%(ext)s',
+    }
+    if quality == "audio":
+        ydl_opts.update({
+            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}]
+        })
 
-    # --- DIRECT LINK - ONE CLICK DOWNLOAD ---
-    if text.startswith("http://") or text.startswith("https://"):
-        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(1)
-        dlink, fsize, fname = await loop.run_in_executor(executor, extract_direct_link, text)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            file_path = ydl.prepare_filename(info)
+            if quality == "audio":
+                file_path = os.path.splitext(file_path)[0] + ".mp3"
 
-        if fsize > DIRECT_MAX_SIZE:
-            await proc_msg.edit_text(f"<b>File Too Large ❌\nSize: {human_readable_size(fsize)} > 800MB</b>", parse_mode=ParseMode.HTML)
-            return
+            # Bhej de
+            if quality == "audio":
+                await query.message.reply_audio(audio=open(file_path, 'rb'), title=info.get('title'))
+            else:
+                await query.message.reply_video(video=open(file_path, 'rb'), caption=f"✅ {quality}p Downloaded")
+            
+            os.remove(file_path)
+            await query.edit_message_caption(caption=f"✅ Done - {quality}")
+    except Exception as e:
+        await query.message.reply_text(f"Error: {e}")
 
-        if not dlink:
-            await proc_msg.edit_text("<b>This Link Expired or Invalid ❌</b>", parse_mode=ParseMode.HTML)
-            return
+app = Application.builder().token(BOT_TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_link))
+app.add_handler(CallbackQueryHandler(download_on_click))
 
-        USER_RENAME_STATES[user_id] = {
-            "url": text, "dlink": dlink, "fsize": fsize, "fname": fname,
-            "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id
-        }
-
-        txt = (
-            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n"
-            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ꜰɪʟᴇ ɴᴀᴍᴇ ✎</b></blockquote>\n"
-        )
-        await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
-        return
-
-if __name__ == "__main__":
-    print("URL Uploader Bot Starting Successfully - Direct Link Support Added")
-    app.run()
+print("Bot Ready - Same look as screenshot")
+app.run_polling()
