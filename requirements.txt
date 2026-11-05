@@ -3,5 +3,3 @@ tgcrypto==1.2.5
 yt-dlp>=2023.12.30
 requests==2.31.0
 aiohttp==3.9.1
-cloudscraper==1.2.71
-beautifulsoup4==4.12.2
