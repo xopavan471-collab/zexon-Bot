@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -173,8 +173,8 @@ async def start_cmd(client, message):
         return
 
     welcome_text = (
-        f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.first_name}</code> !!</b>\n\n"
-        "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⎈</b></blockquote>\n"
+        f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.first_name}</code></b>\n\n"
+        "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⚘</b></blockquote>\n"
         "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ʏᴏᴜʀ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ ᴍᴀɢɴᴇᴛ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ꜰʀᴏᴍ ᴅᴏᴄᴜᴍᴇɴᴛ ꜰɪʟᴇ ᴀɴᴅ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜱᴀᴍᴇ ʟɪɴᴋ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ᴀɴᴅ ᴍᴏʀᴇ, ᴛʜᴇ ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀɴᴅ ꜱᴇɴᴅ ʏᴏᴜ ꜰɪʟᴇꜱ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
@@ -268,7 +268,7 @@ async def process(client, message):
                             downloaded += len(chunk)
                             now = time.time()
                             is_complete = (downloaded >= total and total > 0)
-                            if total > 0 and (now - last[0] > 10.0 or is_complete):
+                            if total > 0 and (now - last[0] > 4.0 or is_complete):
                                 last[0] = now
                                 percent = 100.0 if is_complete else ((downloaded / total) * 100)
                                 speed = downloaded / (now - start + 0.001)
@@ -303,7 +303,7 @@ async def process(client, message):
                 now = time.time()
                 is_complete = (current >= total and total > 0)
                 percent = 100.0 if is_complete else ((current / total) * 100 if total > 0 else 0)
-                if not is_complete and (now - last_up[0] < 10.0): return
+                if not is_complete and (now - last_up[0] < 14.0): return
                 last_up[0] = now
                 speed = current / (now - upload_start[0] + 0.001)
                 eta = 0 if is_complete else ((total - current) / speed if speed > 0 else 0)
