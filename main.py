@@ -373,7 +373,7 @@ async def process(client, message):
         txt = (
             f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
             f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n"
-            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ</b><blockquote>\n"
+            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
         )
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
 
