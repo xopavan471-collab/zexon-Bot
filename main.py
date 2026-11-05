@@ -89,8 +89,9 @@ async def link_handler(client: Client, message: Message):
             ydl_opts = {
                 'quiet': True, 
                 'no_warnings': True,
+                'format': 'best',
                 'http_headers': YT_HEADERS,
-                'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+                'extractor_args': {'youtube': {'player_client': ['android']}}
             }
             if COOKIE_FILE:
                 ydl_opts['cookiefile'] = COOKIE_FILE
@@ -139,7 +140,7 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
     
     ydl_opts = {
         'http_headers': YT_HEADERS,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'extractor_args': {'youtube': {'player_client': ['android']}},
         'outtmpl': output_template,
     }
     if COOKIE_FILE:
@@ -153,11 +154,9 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
             'preferredquality': '192',
         }]
     else:
-        res_map = {"360": "360", "480": "480", "720": "720", "1080": "1080"}
-        height = res_map.get(format_type, "720")
-        ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best'
-        ydl_opts['merge_output_format'] = 'mp4'
-        
+        # Safe format selection taaki merge error ya format not available ka natak na ho
+        ydl_opts['format'] = 'best'
+
     try:
         def download_file():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
