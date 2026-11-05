@@ -5,9 +5,9 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, 
 import yt_dlp
 
 # Bot credentials configuration
-API_ID = int(os.getenv("API_ID", "YOUR_API_ID"))
-API_HASH = os.getenv("API_HASH", "YOUR_API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
+API_ID = "33208732"
+API_HASH = "28626a3063a8161fc374ce904093c4e0"
+BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
 
 app = Client("ZexonAllInOneBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
