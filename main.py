@@ -4,16 +4,16 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import yt_dlp
 
-# Apne bot credentials yahan daalein ya environment variables use karein
-API_ID = "33208732"
-API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
+# Bot credentials configuration
+API_ID = int(os.getenv("API_ID", "YOUR_API_ID"))
+API_HASH = os.getenv("API_HASH", "YOUR_API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
 
 app = Client("ZexonAllInOneBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 user_data = {}
 
-# Common headers for yt-dlp to bypass bot detection on YouTube/Facebook
+# Common headers to bypass bot detection on platforms
 YT_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
@@ -43,7 +43,7 @@ async def start_handler(client: Client, message: Message):
     welcome_text = (
         f"**👋 Welcome to Zexon All-in-One Downloader Bot!**\n\n"
         f"Yahan aap Instagram, YouTube aur Facebook ke links bhej kar asani se media download kar sakte hain.\n\n"
-        f"Bas koi bhi link yahan bhejhiye! 🚀"
+        f"Bas koi bhi link yahan bhejhiye!"
     )
     await message.reply_text(welcome_text)
 
@@ -52,7 +52,7 @@ async def link_handler(client: Client, message: Message):
     url = message.text.strip()
     status_msg = await message.reply_text("Checking... 🔍")
     
-    # Instagram ke liye direct download flow
+    # Instagram link flow: Checking -> Downloading -> Send video directly
     if "instagram.com" in url:
         await status_msg.edit_text("Downloading... ⏳")
         
@@ -85,12 +85,17 @@ async def link_handler(client: Client, message: Message):
             await status_msg.edit_text(f"❌ Failed: {str(e)}")
             
     else:
-        # YouTube ya Facebook ke liye thumbnail aur quality options show karna
+        # YouTube / Facebook link flow: Thumbnail, Title, Quality buttons
         try:
             ydl_opts = {
                 'quiet': True, 
                 'no_warnings': True,
-                'http_headers': YT_HEADERS
+                'http_headers': YT_HEADERS,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web']
+                    }
+                }
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -128,7 +133,7 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
     url = user_data[user_id]['url']
     format_type = data.split("_")[1]
     
-    # Post ko delete karke Downloading... start karna
+    # Delete preview post and start Downloading... status message
     await callback_query.message.delete()
     status_msg = await client.send_message(callback_query.message.chat.id, "Downloading... ⏳ Please wait.")
     
@@ -140,6 +145,11 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
             'format': 'bestaudio/best',
             'outtmpl': output_template,
             'http_headers': YT_HEADERS,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -153,6 +163,11 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
             'format': f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
             'outtmpl': output_template,
             'http_headers': YT_HEADERS,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
             'merge_output_format': 'mp4',
         }
         
