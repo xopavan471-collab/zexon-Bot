@@ -4,6 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import yt_dlp
 
+# Apne bot credentials yahan daalein ya environment variables use karein
 API_ID = "33208732"
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
 BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
@@ -11,6 +12,11 @@ BOT_TOKEN = "9168309428:AAE8sogWyIgeS3KG8oKJJVxH-BA8dYaf_hg"
 app = Client("ZexonAllInOneBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 user_data = {}
+
+# Common headers for yt-dlp to bypass bot detection on YouTube/Facebook
+YT_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+}
 
 def get_quality_keyboard():
     return InlineKeyboardMarkup(
@@ -46,7 +52,7 @@ async def link_handler(client: Client, message: Message):
     url = message.text.strip()
     status_msg = await message.reply_text("Checking... 🔍")
     
-    # Check if link is Instagram
+    # Instagram ke liye direct download flow
     if "instagram.com" in url:
         await status_msg.edit_text("Downloading... ⏳")
         
@@ -56,6 +62,7 @@ async def link_handler(client: Client, message: Message):
         ydl_opts = {
             'format': 'best',
             'outtmpl': output_template,
+            'http_headers': YT_HEADERS,
         }
         
         try:
@@ -78,9 +85,13 @@ async def link_handler(client: Client, message: Message):
             await status_msg.edit_text(f"❌ Failed: {str(e)}")
             
     else:
-        # YouTube ya Facebook ke liye thumbnail aur quality options
+        # YouTube ya Facebook ke liye thumbnail aur quality options show karna
         try:
-            ydl_opts = {'quiet': True, 'no_warnings': True}
+            ydl_opts = {
+                'quiet': True, 
+                'no_warnings': True,
+                'http_headers': YT_HEADERS
+            }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get('title', 'Social Media Video')
@@ -128,6 +139,7 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': output_template,
+            'http_headers': YT_HEADERS,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -140,6 +152,7 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
         ydl_opts = {
             'format': f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best',
             'outtmpl': output_template,
+            'http_headers': YT_HEADERS,
             'merge_output_format': 'mp4',
         }
         
