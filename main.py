@@ -172,7 +172,7 @@ async def start_cmd(client, message):
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ ⛯", url="https://t.me/zexon_Bot_updates")],
+        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ ☼", url="https://t.me/zexon_Bot_updates")],
         [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ♳", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ ⚦", url="https://t.me/zexon_x")],
         [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
     ])
@@ -258,13 +258,15 @@ async def process(client, message):
         chat_id = message.chat.id
 
         if prompt_id:
-            try: await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id])
-            except Exception: pass
+            try:
+                await client.edit_message_text(chat_id=chat_id, message_id=prompt_id, text="𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML)
+                await asyncio.sleep(4)
+                await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id])
+            except Exception:
+                pass
         try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id])
         except Exception: pass
-
         status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
-        await asyncio.sleep(1)
 
         try:
             if not dlink:
@@ -312,7 +314,8 @@ async def process(client, message):
                                      f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
                                      f"📦 Done : {human_readable_size(downloaded)}\n"
                                      f"⚙️ Speed : {human_readable_size(speed)}\n"
-                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
+                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
+                                     f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>\n"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -342,7 +345,8 @@ async def process(client, message):
                     f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
                     f"📦 Done : {human_readable_size(current)}\n"
                     f"⚙️ Speed : {human_readable_size(speed)}\n"
-                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
+                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
+                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>\n"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
@@ -372,7 +376,7 @@ async def process(client, message):
 
     if is_mf or is_dev:
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(1)
+        await asyncio.sleep(4)
         if is_mf:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
         else:
@@ -399,5 +403,5 @@ async def process(client, message):
         return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting - Final Fixed")
+    print("URL Uploader Bot Starting - Final Fixed Old Button Style + 2 Sec")
     app.run()
