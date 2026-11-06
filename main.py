@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -257,16 +257,16 @@ async def process(client, message):
         user_msg_id = link_data.get("user_msg_id")
         chat_id = message.chat.id
 
-        if prompt_id:
-            try:
-                await client.edit_message_text(chat_id=chat_id, message_id=prompt_id, text="𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML)
-                await asyncio.sleep(4)
-                await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id])
-            except Exception:
-                pass
-        try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id])
-        except Exception: pass
+        try:
+            await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id, message.id])
+        except Exception:
+            try: await client.delete_messages(chat_id=chat_id, message_ids=[prompt_id])
+            except: pass
+            try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id])
+            except: pass
+
         status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
+        await asyncio.sleep(4)
 
         try:
             if not dlink:
@@ -311,11 +311,11 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
+                                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
                                      f"📦 Done : {human_readable_size(downloaded)}\n"
                                      f"⚙️ Speed : {human_readable_size(speed)}\n"
                                      f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                                     f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>\n"
+                                     f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -342,11 +342,11 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
+                    f"<blockquote>💾 Size : {human_readable_size(total)}\n"
                     f"📦 Done : {human_readable_size(current)}\n"
                     f"⚙️ Speed : {human_readable_size(speed)}\n"
                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>\n"
+                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
@@ -376,7 +376,7 @@ async def process(client, message):
 
     if is_mf or is_dev:
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(4)
+        await asyncio.sleep(10)
         if is_mf:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
         else:
@@ -391,17 +391,18 @@ async def process(client, message):
 
     elif text.startswith("http://") or text.startswith("https://"):
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
+        await asyncio.sleep(10)
         try:
             head_r = requests.head(text, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True, timeout=20)
             fsize = int(head_r.headers.get("content-length", 0))
             fname = text.split("/")[-1].split("?")[0] or "file.bin"
             USER_RENAME_STATES[user_id] = {"url": text, "dlink": text, "fsize": fsize, "fname": fname, "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
-            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✍︎</b></blockquote>\n"
+            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
             await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         except Exception:
             await proc_msg.edit_text("<b>Invalid Link ❌</b>", parse_mode=ParseMode.HTML)
         return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting - Final Fixed Old Button Style + 2 Sec")
+    print("URL Uploader Bot Starting - Final 10+4 + Thanks Fixed")
     app.run()
