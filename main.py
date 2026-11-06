@@ -23,9 +23,6 @@ ADMIN_ID = 8562470788
 REQUIRED_CHANNEL = -1004334558910
 CHANNEL_URL = "https://t.me/zexon_Bot_updates"
 
-MEDIAFIRE_MAX_SIZE = 800* 1024 * 1024
-DIRECT_MAX_SIZE = 800 * 1024 * 1024
-
 REACTION_EMOJIS = ["🎉", "🥺", "😅", "⚡", "😊", "🙏", "🔥", "😍", "😘", "😐", "😌", "😃", "😂", "😭", "🙃", "🤭", "🤨", "😈", "👻", "👍"]
 
 USERS_FILE = "users.json"
@@ -175,9 +172,9 @@ async def start_cmd(client, message):
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
-        [InlineKeyboardButton("ℹ️ Help", url="https://t.me/zexon_x"), InlineKeyboardButton("⭐ Plans", url="https://t.me/zexon_music_Bot")],
-        [InlineKeyboardButton("🗑️ Close", callback_data="bot_close")],
+        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
+        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ", url="https://t.me/zexon_x")],
+        [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
     ])
     await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
 
@@ -205,7 +202,6 @@ async def broadcast_cmd(client, message):
             return
         b_text = " ".join(message.command[1:])
         use_reply = False
-
     sts = await message.reply_text(f"<b>Broadcasting to {len(users_set)} users... ⏳</b>", parse_mode=ParseMode.HTML)
     ok = 0
     fail = 0
@@ -313,7 +309,7 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
+                                     f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
                                      f"📦 Done : {human_readable_size(downloaded)}\n"
                                      f"⚙️ Speed : {human_readable_size(speed)}\n"
                                      f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
@@ -343,7 +339,7 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote>💾 Size : {human_readable_size(total)}\n"
+                    f"<blockquote>💾 Sizxe : {human_readable_size(total)}\n"
                     f"📦 Done : {human_readable_size(current)}\n"
                     f"⚙️ Speed : {human_readable_size(speed)}\n"
                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
@@ -403,5 +399,5 @@ async def process(client, message):
         return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting - Fixed and Running")
+    print("URL Uploader Bot Starting - Final Fixed")
     app.run()
