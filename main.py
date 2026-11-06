@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN HAI"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -172,8 +172,8 @@ async def start_cmd(client, message):
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
-        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ", url="https://t.me/zexon_x")],
+        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ ⛯", url="https://t.me/zexon_Bot_updates")],
+        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ♳", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ ⚦", url="https://t.me/zexon_x")],
         [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
     ])
     await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
@@ -392,7 +392,7 @@ async def process(client, message):
             fsize = int(head_r.headers.get("content-length", 0))
             fname = text.split("/")[-1].split("?")[0] or "file.bin"
             USER_RENAME_STATES[user_id] = {"url": text, "dlink": text, "fsize": fsize, "fname": fname, "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
-            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
+            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✍︎</b></blockquote>\n"
             await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         except Exception:
             await proc_msg.edit_text("<b>Invalid Link ❌</b>", parse_mode=ParseMode.HTML)
