@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -174,10 +174,11 @@ async def start_cmd(client, message):
         "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ᴀʟᴍᴏꜱᴛ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴡᴇ ᴄᴀɴ ᴅᴏᴡɴʟᴏᴀᴅ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋꜱ ᴀɴᴅ ᴍᴏʀᴇ, ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴜᴘʟᴏᴀᴅ ᴛʜᴇ ꜰɪʟᴇ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
+    # Updated with Uploader X Bot color styling (Green, Blue, Red)
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("ᴜᴘᴅᴀᴛᴇꜱ", url="https://t.me/zexon_Bot_updates")],
-        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/zexon_music_Bot"), InlineKeyboardButton("ʜᴇʟᴩ", url="https://t.me/zexon_x")],
-        [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings", style="success")],
+        [InlineKeyboardButton("ℹ️ Help", url="https://t.me/zexon_x", style="primary"), InlineKeyboardButton("⭐ Plans", url="https://t.me/zexon_music_Bot", style="primary")],
+        [InlineKeyboardButton("🗑️ Close", callback_data="bot_close", style="danger")],
     ])
     await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
 
