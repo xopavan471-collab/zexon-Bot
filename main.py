@@ -174,11 +174,10 @@ async def start_cmd(client, message):
         "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ᴀʟᴍᴏꜱᴛ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴡᴇ ᴄᴀɴ ᴅᴏᴡɴʟᴏᴀᴅ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋꜱ ᴀɴᴅ ᴍᴏʀᴇ, ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴜᴘʟᴏᴀᴅ ᴛʜᴇ ꜰɪʟᴇ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
-    # Updated with Uploader X Bot color styling (Green, Blue, Red)
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚙️ Settings", callback_data="settings", style="success")],
-        [InlineKeyboardButton("ℹ️ Help", url="https://t.me/zexon_x", style="primary"), InlineKeyboardButton("⭐ Plans", url="https://t.me/zexon_music_Bot", style="primary")],
-        [InlineKeyboardButton("🗑️ Close", callback_data="bot_close", style="danger")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")],
+        [InlineKeyboardButton("ℹ️ Help", url="https://t.me/zexon_x"), InlineKeyboardButton("⭐ Plans", url="https://t.me/zexon_music_Bot")],
+        [InlineKeyboardButton("🗑️ Close", callback_data="bot_close")],
     ])
     await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
 
@@ -404,5 +403,5 @@ async def process(client, message):
         return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting - Fixed Double + Stats Added")
+    print("URL Uploader Bot Starting - Fixed and Running")
     app.run()
