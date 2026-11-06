@@ -77,9 +77,7 @@ def get_progress_bar(p):
 def format_eta(seconds):
     if seconds <= 0:
         return "0 S"
-    mins = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{secs} S"
+    return f"{int(seconds)} S"
 
 def safe_remove(p):
     try:
@@ -106,7 +104,7 @@ def get_join_keyboard():
     ])
 
 def extract_mediafire_link(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     for _ in range(3):
         try:
             r = requests.get(url, headers=headers, timeout=30)
@@ -128,7 +126,7 @@ def extract_mediafire_link(url):
     return None, None, None
 
 def extract_devuploads_link(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     for _ in range(3):
         try:
             r = requests.get(url, headers=headers, timeout=30)
@@ -167,15 +165,13 @@ async def react_user_message(message):
 async def start_cmd(client, message):
     add_user(message.from_user.id)
     await react_user_message(message)
-
     if not await check_join(client, message.from_user.id):
         await message.reply_text("<b>ᴅᴇᴀʀ, ꜰɪʀꜱᴛ ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ 🔐</b>", reply_markup=get_join_keyboard(), parse_mode=ParseMode.HTML)
         return
-
     welcome_text = (
         f"<b>𝐇ᴇʟʟᴏ <code>{message.from_user.first_name}</code></b>\n\n"
         "<blockquote><b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ⚘</b></blockquote>\n"
-        "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ʏᴏᴜʀ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴅᴏᴡɴʟᴏᴀᴅ ᴀɴʏ ᴍᴀɢɴᴇᴛ ꜱᴜᴘᴘᴏʀᴛᴇᴅ ʟɪɴᴋ ꜰʀᴏᴍ ᴅᴏᴄᴜᴍᴇɴᴛ ꜰɪʟᴇ ᴀɴᴅ ꜰᴀꜱᴛ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ꜱᴀᴍᴇ ʟɪɴᴋ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ᴀɴᴅ ᴍᴏʀᴇ, ᴛʜᴇ ꜱᴇɴᴅ ᴍᴇ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀɴᴅ ꜱᴇɴᴅ ʏᴏᴜ ꜰɪʟᴇꜱ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
+        "<blockquote><i>ᴅᴇᴀʀ, ɪ ᴀᴍ ᴀʟᴍᴏꜱᴛ ᴜʀʟ ᴜᴘʟᴏᴀᴅᴇʀ ʙᴏᴛ ᴡᴇ ᴄᴀɴ ᴅᴏᴡɴʟᴏᴀᴅ ᴍᴇᴅɪᴀ ꜰɪʀᴇ ʟɪɴᴋꜱ ᴀɴᴅ ᴍᴏʀᴇ, ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ᴀɴᴅ ɪ ᴡɪʟʟ ᴜᴘʟᴏᴀᴅ ᴛʜᴇ ꜰɪʟᴇ ꜱᴇᴄᴜʀᴇ ɪɴꜱᴛᴀɴᴛʟʏ.</i></blockquote>\n"
         "<blockquote><b>ᴘʟᴇᴀꜱᴇ ꜱʜᴀʀᴇ ᴀɴᴅ ɢɪᴠᴇ ꜱᴜᴘᴘᴏʀᴛ ༗</b></blockquote>"
     )
     kb = InlineKeyboardMarkup([
@@ -184,6 +180,46 @@ async def start_cmd(client, message):
         [InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="bot_close")],
     ])
     await message.reply_text(welcome_text, reply_markup=kb, parse_mode=ParseMode.HTML)
+
+@app.on_message(filters.command(["stats", "users_info", "status"]) & filters.user(ADMIN_ID))
+async def stats_cmd(client, message):
+    total_users = len(users_set)
+    txt = (
+        f"<blockquote><b>📊 BOT USERS STATUS</b></blockquote>\n\n"
+        f"<b>Total Users:</b> <code>{total_users}</code>\n"
+        f"<b>Active Tasks:</b> <code>{len(USER_RENAME_STATES)}</code>\n"
+        f"<b>In Cooldown:</b> <code>{len(USER_COOLDOWNS)}</code>\n"
+        f"<b>Storage File:</b> <code>{USERS_FILE}</code>\n"
+        f"<b>Bot:</b> <code>Online ✅</code>"
+    )
+    await message.reply_text(txt, parse_mode=ParseMode.HTML)
+
+@app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
+async def broadcast_cmd(client, message):
+    if message.reply_to_message:
+        b_text = message.reply_to_message
+        use_reply = True
+    else:
+        if len(message.command) < 2:
+            await message.reply_text("<b>Usage:</b> /broadcast Your message", parse_mode=ParseMode.HTML)
+            return
+        b_text = " ".join(message.command[1:])
+        use_reply = False
+
+    sts = await message.reply_text(f"<b>Broadcasting to {len(users_set)} users... ⏳</b>", parse_mode=ParseMode.HTML)
+    ok = 0
+    fail = 0
+    for uid in users_set:
+        try:
+            if use_reply:
+                await b_text.copy(uid)
+            else:
+                await client.send_message(uid, b_text, parse_mode=ParseMode.HTML)
+            ok += 1
+            await asyncio.sleep(0.2)
+        except Exception:
+            fail += 1
+    await sts.edit_text(f"<b>Broadcast Done ✅</b>\nSuccess: <code>{ok}</code>\nFailed: <code>{fail}</code>", parse_mode=ParseMode.HTML)
 
 @app.on_callback_query(filters.regex("check_joined"))
 async def check_joined_cb(client, callback_query):
@@ -200,7 +236,7 @@ async def close_cb(client, callback_query):
     try: await callback_query.message.delete()
     except Exception: pass
 
-@app.on_message(filters.text & ~filters.command(["start"]))
+@app.on_message(filters.text & ~filters.command(["start", "stats", "users_info", "status", "broadcast"]))
 async def process(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
@@ -208,7 +244,7 @@ async def process(client, message):
 
     if user_id in USER_COOLDOWNS and time.time() < USER_COOLDOWNS[user_id]:
         remaining = int(USER_COOLDOWNS[user_id] - time.time())
-        await message.reply_text(f"<b>Please wait <code>{remaining}s</code> before sending next request!</b>", parse_mode=ParseMode.HTML)
+        await message.reply_text(f"<b>Please wait <code>{remaining}s</code> before next request!</b>", parse_mode=ParseMode.HTML)
         return
 
     loop = asyncio.get_running_loop()
@@ -232,7 +268,7 @@ async def process(client, message):
         except Exception: pass
 
         status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
         try:
             if not dlink:
@@ -280,8 +316,7 @@ async def process(client, message):
                                      f"<blockquote>💾 Size : {human_readable_size(total)}\n"
                                      f"📦 Done : {human_readable_size(downloaded)}\n"
                                      f"⚙️ Speed : {human_readable_size(speed)}\n"
-                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                                     f"<blockquote><b> 𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot </blockquote>"
+                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -289,13 +324,10 @@ async def process(client, message):
                                 except Exception: pass
 
             await loop.run_in_executor(executor, dl_file)
-
             new_file_path = os.path.join(os.path.dirname(local_file) or ".", new_name)
             os.rename(local_file, new_file_path)
-
             await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>", parse_mode=ParseMode.HTML)
             await asyncio.sleep(1)
-
             upload_start = [time.time()]
             last_up = [0]
 
@@ -314,28 +346,17 @@ async def process(client, message):
                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
                     f"📦 Done : {human_readable_size(current)}\n"
                     f"⚙️ Speed : {human_readable_size(speed)}\n"
-                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ : @URL_Uploadex_Robot </blockquote>"
+                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
 
-            await client.send_document(
-                chat_id=message.chat.id,
-                document=new_file_path,
-                file_name=new_name,
-                progress=upload_progress,
-                force_document=True,
-                reply_to_message_id=user_msg_id
-            )
-
+            await client.send_document(chat_id=message.chat.id, document=new_file_path, file_name=new_name, progress=upload_progress, force_document=True, reply_to_message_id=user_msg_id)
             try: await status_msg.delete()
             except Exception: pass
-
             USER_COOLDOWNS[user_id] = time.time() + 60
-
         except Exception as e:
-            try: await status_msg.edit_text(f"❌ Error: <code>{str(e)}</code>", parse_mode=ParseMode.HTML)
+            try: await status_msg.edit_text(f"❌ Error: <code>{str(e)[:300]}</code>", parse_mode=ParseMode.HTML)
             except Exception: pass
         finally:
             safe_remove(local_file)
@@ -355,36 +376,32 @@ async def process(client, message):
 
     if is_mf or is_dev:
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
-        await asyncio.sleep(4)
+        await asyncio.sleep(1)
         if is_mf:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
         else:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_devuploads_link, text)
-
         if not dlink:
             await proc_msg.edit_text("<b>This Link Expired ❌</b>", parse_mode=ParseMode.HTML)
             return
-
-        USER_RENAME_STATES[user_id] = {
-            "url": text, "dlink": dlink, "fsize": fsize, "fname": fname,
-            "is_mf": is_mf, "is_dev": is_dev, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id
-        }
-
-        txt = (
-            f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n"
-            f"<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n"
-            f"<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
-        )
+        USER_RENAME_STATES[user_id] = {"url": text, "dlink": dlink, "fsize": fsize, "fname": fname, "is_mf": is_mf, "is_dev": is_dev, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
+        txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
+        return
 
-    if text.startswith("http://") or text.startswith("https://"):
+    elif text.startswith("http://") or text.startswith("https://"):
         proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
         try:
             head_r = requests.head(text, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True, timeout=20)
             fsize = int(head_r.headers.get("content-length", 0))
+            fname = text.split("/")[-1].split("?")[0] or "file.bin"
+            USER_RENAME_STATES[user_id] = {"url": text, "dlink": text, "fsize": fsize, "fname": fname, "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
+            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
+            await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         except Exception:
-            fsize = 0
+            await proc_msg.edit_text("<b>Invalid Link ❌</b>", parse_mode=ParseMode.HTML)
+        return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting Successfully")
+    print("URL Uploader Bot Starting - Fixed Double + Stats Added")
     app.run()
