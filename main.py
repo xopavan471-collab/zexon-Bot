@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -66,11 +66,11 @@ def get_random_emoji():
     return random.choice(REACTION_EMOJIS)
 
 def human_readable_size(b):
-    if not b: return "0 MB"
-    n = ("B", "KB", "MB", "GB")
+    if not b: return "0 ᴍʙ"
+    n = ("ᴍʙ", "ᴋʙ", "ᴍʙ", "ɢʙ")
     i = int(math.floor(math.log(b, 1024))) if b > 0 else 0
     p = math.pow(1024, i)
-    return f"{round(b/p, 2)} MB" if i <= 2 else f"{round(b/p, 2)} GB"
+    return f"{round(b/p, 2)} ᴍʙ" if i <= 2 else f"{round(b/p, 2)} ɢʙ"
 
 def get_progress_bar(p):
     t = 16
@@ -82,7 +82,7 @@ def get_progress_bar(p):
 
 def format_eta(seconds):
     if seconds <= 0:
-        return "0 S"
+        return "0 s"
     return f"{int(seconds)} S"
 
 def safe_remove(p):
@@ -163,13 +163,13 @@ app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_tok
 # --- COOLDOWN HELPER - FANCY ---
 async def start_cooldown_countdown(client, chat_id, user_id):
     try:
-        cool = await client.send_message(chat_id, f"Cooldown progress Please wait {fancy_num('2 : 00')} second Then send me next Link")
+        cool = await client.send_message(chat_id, f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
         for sec in range(120, -1, -1):
             mins = sec // 60
             secs = sec % 60
             fancy_time = fancy_num(f"{mins} : {secs:02d}")
             try:
-                await cool.edit_text(f"Cooldown progress Please wait {fancy_time} second Then send me next Link")
+                await cool.edit_text(f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_time} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
             except Exception:
                 pass
             await asyncio.sleep(1)
@@ -273,7 +273,7 @@ async def process(client, message):
         remaining = int(USER_COOLDOWNS[user_id] - time.time())
         mins = remaining // 60
         secs = remaining % 60
-        await message.reply_text(f"⏳ Cooldown progress\nPlease wait {fancy_num(f'{mins} : {secs:02d}')} second\nThen send me next Link")
+        await message.reply_text(f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num(f'{mins} : {secs:02d}')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
         return
 
     loop = asyncio.get_running_loop()
@@ -298,7 +298,7 @@ async def process(client, message):
             try: await client.delete_messages(chat_id=chat_id, message_ids=[message.id])
             except: pass
 
-        status_msg = await client.send_message(chat_id, "𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
+        status_msg = await client.send_message(chat_id, "ᴘʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=user_msg_id)
         await asyncio.sleep(4)
 
         try:
@@ -344,10 +344,10 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>⎙ ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
-                                     f"☑︎ ᴅᴏɴᴇ : {fancy_num(human_readable_size(downloaded))}\n"
-                                     f"⛯ ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
-                                     f"⏰︎ ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                                     f"<blockquote>ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
+                                     f"ᴅᴏɴᴇ : {fancy_num(human_readable_size(downloaded))}\n"
+                                     f"ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
+                                     f"ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
                                      f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                                 )
                                 try:
@@ -359,7 +359,7 @@ async def process(client, message):
             new_file_path = os.path.join(os.path.dirname(local_file) or ".", new_name)
             os.rename(local_file, new_file_path)
             await status_msg.edit_text("<b><i>𝐏ʟᴇᴀꜱᴇ ᴡᴀɪᴛ ᴜᴘʟᴏᴀᴅɪɴɢ...</i></b>", parse_mode=ParseMode.HTML)
-            await asyncio.sleep(1)
+            await asyncio.sleep(4)
             upload_start = [time.time()]
             last_up = [0]
 
@@ -375,10 +375,10 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote>⎙ ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
-                    f"☑︎ ᴅᴏɴᴇ : {fancy_num(human_readable_size(current))}\n"
-                    f"⛯ ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
-                    f"⏰︎ ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                    f"<blockquote>ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
+                    f"ᴅᴏɴᴇ : {fancy_num(human_readable_size(current))}\n"
+                    f"ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
+                    f"ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
                     f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
@@ -409,7 +409,7 @@ async def process(client, message):
     is_dev = "devuploads.com" in text
 
     if is_mf or is_dev:
-        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
+        proc_msg = await message.reply_text("ᴘʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
         await asyncio.sleep(10)
         if is_mf:
             dlink, fsize, fname = await loop.run_in_executor(executor, extract_mediafire_link, text)
@@ -424,7 +424,7 @@ async def process(client, message):
         return
 
     elif text.startswith("http://") or text.startswith("https://"):
-        proc_msg = await message.reply_text("𝐏ʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
+        proc_msg = await message.reply_text("ᴘʀᴏꜱᴇꜱꜱɪɴɢ...⏳", parse_mode=ParseMode.HTML, reply_to_message_id=message.id)
         await asyncio.sleep(10)
         try:
             head_r = requests.head(text, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True, timeout=20)
