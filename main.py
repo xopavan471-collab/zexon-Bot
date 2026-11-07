@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -83,7 +83,7 @@ def get_progress_bar(p):
 def format_eta(seconds):
     if seconds <= 0:
         return "0 s"
-    return f"{int(seconds)} S"
+    return f"{int(seconds)} ꜱ"
 
 def safe_remove(p):
     try:
@@ -163,13 +163,13 @@ app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_tok
 # --- COOLDOWN HELPER - FANCY ---
 async def start_cooldown_countdown(client, chat_id, user_id):
     try:
-        cool = await client.send_message(chat_id, f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
+        cool = await client.send_message(chat_id, f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b><blockquote>")
         for sec in range(120, -1, -1):
             mins = sec // 60
             secs = sec % 60
             fancy_time = fancy_num(f"{mins} : {secs:02d}")
             try:
-                await cool.edit_text(f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_time} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
+                await cool.edit_text(f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_time} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ ⚘</b></blockquote>")
             except Exception:
                 pass
             await asyncio.sleep(1)
@@ -344,10 +344,10 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
-                                     f"ᴅᴏɴᴇ : {fancy_num(human_readable_size(downloaded))}\n"
-                                     f"ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
-                                     f"ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                                     f"<blockquote><b>ꜱɪᴢᴇ :</b> {fancy_num(human_readable_size(total))}\n"
+                                     f"<b>ᴅᴏɴᴇ :</b> {fancy_num(human_readable_size(downloaded))}\n"
+                                     f"<b>ꜱᴘᴇᴇᴅ :</b> {fancy_num(human_readable_size(speed))}\n"
+                                     f"<b>ʟᴇꜰᴛ ᴇᴛᴀ :</b> {fancy_num(format_eta(eta))}</blockquote>\n\n"
                                      f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                                 )
                                 try:
@@ -375,10 +375,10 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote>ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
-                    f"ᴅᴏɴᴇ : {fancy_num(human_readable_size(current))}\n"
-                    f"ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
-                    f"ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                    f"<blockquote><b>ꜱɪᴢᴇ :</b> {fancy_num(human_readable_size(total))}\n"
+                    f"<b>ᴅᴏɴᴇ :</b> {fancy_num(human_readable_size(current))}\n"
+                    f"<b>ꜱᴘᴇᴇᴅ :</b> {fancy_num(human_readable_size(speed))}\n"
+                    f"<b>ʟᴇꜰᴛ ᴇᴛᴀ :</b> {fancy_num(format_eta(eta))}</blockquote>\n\n"
                     f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
