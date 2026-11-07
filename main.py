@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -163,13 +163,13 @@ app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_tok
 # --- COOLDOWN HELPER - FANCY ---
 async def start_cooldown_countdown(client, chat_id, user_id):
     try:
-        cool = await client.send_message(chat_id, f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b><blockquote>")
+        cool = await client.send_message(chat_id, f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ᴛʜᴇɴ ꜱᴇɴᴅ ɴᴇxᴛ ʟɪɴᴋ ⚘</b><blockquote>")
         for sec in range(120, -1, -1):
             mins = sec // 60
             secs = sec % 60
             fancy_time = fancy_num(f"{mins} : {secs:02d}")
             try:
-                await cool.edit_text(f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_time} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ ⚘</b></blockquote>")
+                await cool.edit_text(f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_time} ꜱᴇᴄᴏɴᴅ ᴛʜᴇɴ ꜱᴇɴᴅ ɴᴇxᴛ ʟɪɴᴋ ⚘</b></blockquote>")
             except Exception:
                 pass
             await asyncio.sleep(1)
