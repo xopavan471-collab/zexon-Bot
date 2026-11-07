@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN HER"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -30,6 +30,15 @@ executor = ThreadPoolExecutor(max_workers=2)
 
 USER_RENAME_STATES = {}
 USER_COOLDOWNS = {}
+
+# --- FANCY NUMBERS ---
+FANCY_DIGITS = {"0":"𝟶","1":"𝟷","2":"𝟸","3":"𝟹","4":"𝟺","5":"𝟻","6":"𝟼","7":"𝟽","8":"𝟾","9":"𝟿"}
+def fancy_num(s):
+    s = str(s)
+    out = ""
+    for ch in s:
+        out += FANCY_DIGITS.get(ch, ch)
+    return out
 
 def load_users():
     if os.path.exists(USERS_FILE):
@@ -151,6 +160,26 @@ def extract_devuploads_link(url):
 
 app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# --- COOLDOWN HELPER - FANCY ---
+async def start_cooldown_countdown(client, chat_id, user_id):
+    try:
+        cool = await client.send_message(chat_id, f"Cooldown progress Please wait {fancy_num('2 : 00')} second Then send me next Link")
+        for sec in range(120, -1, -1):
+            mins = sec // 60
+            secs = sec % 60
+            fancy_time = fancy_num(f"{mins} : {secs:02d}")
+            try:
+                await cool.edit_text(f"Cooldown progress Please wait {fancy_time} second Then send me next Link")
+            except Exception:
+                pass
+            await asyncio.sleep(1)
+        try:
+            await cool.edit_text("ɴᴏᴡ ʏᴏᴜ ᴄᴀɴ ꜱᴇɴᴅ ᴍᴇ ʟɪɴᴋ ☍")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
 async def react_user_message(message):
     try:
         emoji = get_random_emoji()
@@ -238,9 +267,13 @@ async def process(client, message):
     text = message.text.strip()
     local_file = None
 
-    if user_id in USER_COOLDOWNS and time.time() < USER_COOLDOWNS[user_id]:
+    is_rename_reply = user_id in USER_RENAME_STATES
+
+    if not is_rename_reply and user_id in USER_COOLDOWNS and time.time() < USER_COOLDOWNS[user_id]:
         remaining = int(USER_COOLDOWNS[user_id] - time.time())
-        await message.reply_text(f"<b>Please wait <code>{remaining}s</code> before next request!</b>", parse_mode=ParseMode.HTML)
+        mins = remaining // 60
+        secs = remaining % 60
+        await message.reply_text(f"⏳ Cooldown progress\nPlease wait {fancy_num(f'{mins} : {secs:02d}')} second\nThen send me next Link")
         return
 
     loop = asyncio.get_running_loop()
@@ -311,11 +344,11 @@ async def process(client, message):
                                 txt = (
                                      f"<b><i>𝐌ᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                                      f"<code>{bar}</code>\n\n"
-                                     f"<blockquote>💾 Size : {human_readable_size(total)}\n"
-                                     f"📦 Done : {human_readable_size(downloaded)}\n"
-                                     f"⚙️ Speed : {human_readable_size(speed)}\n"
-                                     f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                                     f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
+                                     f"<blockquote>⎙ ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
+                                     f"☑︎ ᴅᴏɴᴇ : {fancy_num(human_readable_size(downloaded))}\n"
+                                     f"⛯ ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
+                                     f"⏰︎ ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                                     f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                                 )
                                 try:
                                     fut = asyncio.run_coroutine_threadsafe(status_msg.edit_text(txt, parse_mode=ParseMode.HTML), loop)
@@ -342,11 +375,11 @@ async def process(client, message):
                 txt = (
                     f"<b><i>𝐌ᴇᴅɪᴀ ᴜᴘʟᴏᴀᴅɪɴɢ :</i></b>\n\n"
                     f"<code>{bar}</code>\n\n"
-                    f"<blockquote>💾 Size : {human_readable_size(total)}\n"
-                    f"📦 Done : {human_readable_size(current)}\n"
-                    f"⚙️ Speed : {human_readable_size(speed)}\n"
-                    f"⏰ Left Eta : {format_eta(eta)}</blockquote>\n\n"
-                    f"<blockquote><b>𝐓ʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
+                    f"<blockquote>⎙ ꜱɪᴢxᴇ : {fancy_num(human_readable_size(total))}\n"
+                    f"☑︎ ᴅᴏɴᴇ : {fancy_num(human_readable_size(current))}\n"
+                    f"⛯ ꜱᴘᴇᴇᴅ : {fancy_num(human_readable_size(speed))}\n"
+                    f"⏰︎ ʟᴇꜰᴛ ᴇᴛᴀ : {fancy_num(format_eta(eta))}</blockquote>\n\n"
+                    f"<blockquote><b>ᴛʜᴀɴᴋꜱ :</b> @URL_Uploadex_Robot</blockquote>"
                 )
                 try: await status_msg.edit_text(txt, parse_mode=ParseMode.HTML)
                 except Exception: pass
@@ -354,7 +387,8 @@ async def process(client, message):
             await client.send_document(chat_id=message.chat.id, document=new_file_path, file_name=new_name, progress=upload_progress, force_document=True, reply_to_message_id=user_msg_id)
             try: await status_msg.delete()
             except Exception: pass
-            USER_COOLDOWNS[user_id] = time.time() + 60
+            USER_COOLDOWNS[user_id] = time.time() + 120
+            await start_cooldown_countdown(client, chat_id, user_id)
         except Exception as e:
             try: await status_msg.edit_text(f"❌ Error: <code>{str(e)[:300]}</code>", parse_mode=ParseMode.HTML)
             except Exception: pass
@@ -385,7 +419,7 @@ async def process(client, message):
             await proc_msg.edit_text("<b>This Link Expired ❌</b>", parse_mode=ParseMode.HTML)
             return
         USER_RENAME_STATES[user_id] = {"url": text, "dlink": dlink, "fsize": fsize, "fname": fname, "is_mf": is_mf, "is_dev": is_dev, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
-        txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
+        txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{fancy_num(human_readable_size(fsize))}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
         await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         return
 
@@ -397,7 +431,7 @@ async def process(client, message):
             fsize = int(head_r.headers.get("content-length", 0))
             fname = text.split("/")[-1].split("?")[0] or "file.bin"
             USER_RENAME_STATES[user_id] = {"url": text, "dlink": text, "fsize": fsize, "fname": fname, "is_mf": False, "is_dev": False, "prompt_msg_id": proc_msg.id, "user_msg_id": message.id}
-            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{human_readable_size(fsize)}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
+            txt = f"<blockquote><b>𝐅ɪʟᴇ 𝐍ᴀᴍᴇ :</b> <code>{fname}</code>\n<b>ꜱɪᴢᴇ :</b> <code>{fancy_num(human_readable_size(fsize))}</code></blockquote>\n<blockquote><b>𝐍ᴏᴡ ꜱᴇɴᴅ ᴍᴇ ɴᴇᴡ ɴᴀᴍᴇ ✎</b></blockquote>\n"
             await proc_msg.edit_text(txt, parse_mode=ParseMode.HTML)
         except Exception:
             await proc_msg.edit_text("<b>Invalid Link ❌</b>", parse_mode=ParseMode.HTML)
