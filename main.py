@@ -17,7 +17,7 @@ import requests
 # --- CONFIG ---
 API_ID = 33208732
 API_HASH = "28626a3063a8161fc374ce904093c4e0"
-BOT_TOKEN = "BOT TOKEN"
+BOT_TOKEN = "9091943258:AAGkW9Kn1VH2kcB1alijI8OEnp6eOjhE6Fw"
 ADMIN_ID = 8562470788
 
 REQUIRED_CHANNEL = -1004334558910
@@ -161,9 +161,9 @@ def extract_devuploads_link(url):
 app = Client("zexon_url_uploader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # --- COOLDOWN HELPER - FANCY ---
-async def start_cooldown_countdown(client, chat_id, user_id):
+async def start_cooldown_countdown(client, chat_id, user_id, reply_to_message_id=None):
     try:
-        cool = await client.send_message(chat_id, f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ᴛʜᴇɴ ꜱᴇɴᴅ ɴᴇxᴛ ʟɪɴᴋ ⚘</b><blockquote>")
+        cool = await client.send_message(chat_id, f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num('2 : 00')} ꜱᴇᴄᴏɴᴅ ᴛʜᴇɴ ꜱᴇɴᴅ ɴᴇxᴛ ʟɪɴᴋ ⚘</b><blockquote>", reply_to_message_id=reply_to_message_id)
         for sec in range(120, -1, -1):
             mins = sec // 60
             secs = sec % 60
@@ -211,7 +211,7 @@ async def start_cmd(client, message):
 async def stats_cmd(client, message):
     total_users = len(users_set)
     txt = (
-        f"<blockquote><b>📊 BOT USERS STATUS</b></blockquote>\n\n"
+        f"<blockquote><b>📊 MY users status</b></blockquote>\n\n"
         f"<b>Total Users:</b> <code>{total_users}</code>\n"
         f"<b>Active Tasks:</b> <code>{len(USER_RENAME_STATES)}</code>\n"
         f"<b>In Cooldown:</b> <code>{len(USER_COOLDOWNS)}</code>\n"
@@ -273,7 +273,7 @@ async def process(client, message):
         remaining = int(USER_COOLDOWNS[user_id] - time.time())
         mins = remaining // 60
         secs = remaining % 60
-        await message.reply_text(f"<b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num(f'{mins} : {secs:02d}')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b>")
+        await message.reply_text(f"<blockquote><b>ᴄᴏᴏʟᴅᴏᴡɴ ᴘʀᴏɢʀᴇꜱꜱ ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ {fancy_num(f'{mins} : {secs:02d}')} ꜱᴇᴄᴏɴᴅ ꜰᴏʀ ʜᴇᴀʟᴛʜ ᴛʜᴇɴ ꜱᴇɴᴅ ʏᴏᴜʀ ɴᴇxᴛ ʟɪɴᴋ</b></blockquote>")
         return
 
     loop = asyncio.get_running_loop()
@@ -335,7 +335,7 @@ async def process(client, message):
                             downloaded += len(chunk)
                             now = time.time()
                             is_complete = (downloaded >= total and total > 0)
-                            if total > 0 and (now - last[0] > 4.0 or is_complete):
+                            if total > 0 and (now - last[0] > 10.0 or is_complete):
                                 last[0] = now
                                 percent = 100.0 if is_complete else ((downloaded / total) * 100)
                                 speed = downloaded / (now - start + 0.001)
@@ -388,7 +388,7 @@ async def process(client, message):
             try: await status_msg.delete()
             except Exception: pass
             USER_COOLDOWNS[user_id] = time.time() + 120
-            await start_cooldown_countdown(client, chat_id, user_id)
+            await start_cooldown_countdown(client, chat_id, user_id, reply_to_message_id=user_msg_id)
         except Exception as e:
             try: await status_msg.edit_text(f"❌ Error: <code>{str(e)[:300]}</code>", parse_mode=ParseMode.HTML)
             except Exception: pass
@@ -438,5 +438,5 @@ async def process(client, message):
         return
 
 if __name__ == "__main__":
-    print("URL Uploader Bot Starting - Final 10+4 + Thanks Fixed")
+    print("URL Uploader Bot Starting")
     app.run()
